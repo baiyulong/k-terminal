@@ -1,0 +1,43 @@
+{
+  "name": "k-terminal",
+  "version": "0.1.0",
+  "description": "Cross-platform SSH client — Server Manager + SSH Launcher + Automation Platform",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/baiyulong/k-terminal.git"
+  },
+  "keywords": ["ssh", "terminal", "tauri", "server-management"],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/baiyulong/k-terminal/issues"
+  },
+  "homepage": "https://github.com/baiyulong/k-terminal#readme",
+  "dependencies": {
+    "@tanstack/react-query": "^5.100.10",
+    "@tauri-apps/api": "^2.11.0",
+    "@tauri-apps/plugin-shell": "^2.3.5",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "zustand": "^5.0.13"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.0",
+    "@tauri-apps/cli": "^2.11.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "autoprefixer": "^10.5.0",
+    "postcss": "^8.5.14",
+    "tailwindcss": "^4.3.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.13"
+  }
+}

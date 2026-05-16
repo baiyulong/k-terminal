@@ -1,0 +1,29 @@
+[package]
+name = "k-terminal"
+version = "0.1.0"
+description = "Cross-platform SSH client"
+authors = []
+edition = "2021"
+
+[lib]
+name = "k_terminal_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+diesel = { version = "2", features = ["sqlite", "r2d2", "chrono"] }
+diesel_migrations = "2"
+russh = "0.60"
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+tokio = { version = "1", features = ["full"] }
+thiserror = "2"
+log = "0.4"
+dirs = "6"
