@@ -13,12 +13,11 @@ pub type DbPool = Arc<r2d2::Pool<ConnectionManager<SqliteConnection>>>;
 pub fn establish_connection_pool() -> DbPool {
     let db_path = get_db_path();
 
-    // Ensure parent directory exists
-    if let Some(parent) = std::path::Path::new(&db_path).parent() {
+    if let Some(parent) = db_path.parent() {
         std::fs::create_dir_all(parent).expect("Failed to create database directory");
     }
 
-    let manager = ConnectionManager::<SqliteConnection>::new(&db_path);
+    let manager = ConnectionManager::<SqliteConnection>::new(db_path.to_string_lossy().to_string());
     let pool = r2d2::Pool::builder()
         .max_size(10)
         .build(manager)
@@ -32,16 +31,12 @@ pub fn establish_connection_pool() -> DbPool {
     Arc::new(pool)
 }
 
-fn get_db_path() -> String {
+pub fn get_db_path() -> std::path::PathBuf {
     let config_dir = dirs::config_dir()
         .expect("Failed to get config directory")
         .join("kterminal");
 
     std::fs::create_dir_all(&config_dir).expect("Failed to create config directory");
 
-    config_dir
-        .join("kterminal.db")
-        .to_str()
-        .expect("Invalid path")
-        .to_string()
+    config_dir.join("kterminal.db")
 }

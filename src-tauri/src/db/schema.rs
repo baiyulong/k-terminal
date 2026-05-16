@@ -58,9 +58,4 @@ diesel::table! {
     }
 }
 
-diesel::allow_tables_to_appear_in_same_query!(
-    servers,
-    groups,
-    terminal_profiles,
-    connection_logs,
-);
+diesel::allow_tables_to_appear_in_same_query!(servers, groups, terminal_profiles, connection_logs,);

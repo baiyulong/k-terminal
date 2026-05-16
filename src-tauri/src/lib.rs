@@ -13,6 +13,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .manage(pool)
         .invoke_handler(tauri::generate_handler![
+            commands::search_commands::search_servers,
             commands::server_commands::list_servers,
             commands::server_commands::get_server,
             commands::server_commands::create_server,
@@ -20,6 +21,30 @@ pub fn run() {
             commands::server_commands::delete_server,
             commands::server_commands::clone_server,
             commands::server_commands::toggle_favorite,
+            commands::ssh_commands::generate_ssh_command,
+            commands::ssh_commands::get_ssh_command_preview,
+            commands::group_commands::list_groups,
+            commands::group_commands::get_group,
+            commands::group_commands::create_group,
+            commands::group_commands::update_group,
+            commands::group_commands::delete_group,
+            commands::group_commands::move_group,
+            commands::group_commands::reorder_groups,
+            commands::group_commands::get_group_tree,
+            commands::terminal_commands::list_terminal_profiles,
+            commands::terminal_commands::get_terminal_profile,
+            commands::terminal_commands::create_terminal_profile,
+            commands::terminal_commands::update_terminal_profile,
+            commands::terminal_commands::delete_terminal_profile,
+            commands::terminal_commands::get_default_terminal_profile,
+            commands::terminal_commands::set_default_terminal_profile,
+            commands::terminal_commands::detect_available_terminals,
+            commands::terminal_commands::seed_default_terminal_profiles,
+            commands::terminal_commands::launch_terminal,
+            commands::terminal_commands::get_recent_connections,
+            commands::settings_commands::export_data,
+            commands::settings_commands::import_data,
+            commands::settings_commands::get_app_info,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
