@@ -1,9 +1,9 @@
-use diesel::BoxableExpression;
 use diesel::dsl::sql;
 use diesel::prelude::*;
 use diesel::r2d2;
 use diesel::sql_types::{Bool, Text};
 use diesel::sqlite::Sqlite;
+use diesel::BoxableExpression;
 
 use crate::db::models::Server;
 use crate::db::schema::servers;
@@ -29,7 +29,9 @@ pub fn search_servers(pool: &DbPool, query: &str) -> Result<Vec<Server>, SearchE
         return Ok(Vec::new());
     }
 
-    let mut conn = pool.get().map_err(|error| SearchError::Pool(error.to_string()))?;
+    let mut conn = pool
+        .get()
+        .map_err(|error| SearchError::Pool(error.to_string()))?;
     let mut search_query = servers::table.into_boxed::<Sqlite>();
 
     for word in &words {
@@ -67,9 +69,7 @@ fn word_filter(word: &str) -> SearchFilter<'static> {
         sql::<Bool>("name LIKE ")
             .bind::<Text, _>(pattern.clone())
             .or(sql::<Bool>("host LIKE ").bind::<Text, _>(pattern.clone()))
-            .or(
-                sql::<Bool>("COALESCE(tags, '') LIKE ").bind::<Text, _>(pattern.clone()),
-            )
+            .or(sql::<Bool>("COALESCE(tags, '') LIKE ").bind::<Text, _>(pattern.clone()))
             .or(sql::<Bool>("COALESCE(description, '') LIKE ").bind::<Text, _>(pattern)),
     )
 }
@@ -82,7 +82,10 @@ fn relevance_score(server: &Server, words: &[String]) -> usize {
                 0
             } else if contains(&server.host, word) {
                 1
-            } else if server.tags.as_deref().is_some_and(|tags| contains(tags, word))
+            } else if server
+                .tags
+                .as_deref()
+                .is_some_and(|tags| contains(tags, word))
                 || server
                     .description
                     .as_deref()
@@ -211,14 +214,7 @@ mod tests {
             None,
             None,
         );
-        insert_server(
-            &pool,
-            "host-match",
-            "Backend",
-            "alpha.internal",
-            None,
-            None,
-        );
+        insert_server(&pool, "host-match", "Backend", "alpha.internal", None, None);
         insert_server(
             &pool,
             "metadata-match",

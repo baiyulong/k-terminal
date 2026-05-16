@@ -149,7 +149,9 @@ pub fn get_config_dir() -> PathBuf {
 }
 
 pub fn export_servers(pool: &DbPool) -> Result<String, ConfigError> {
-    let mut conn = pool.get().map_err(|error| ConfigError::Pool(error.to_string()))?;
+    let mut conn = pool
+        .get()
+        .map_err(|error| ConfigError::Pool(error.to_string()))?;
     let stored_groups = groups::table
         .order((groups::sort_order.asc(), groups::name.asc()))
         .load::<Group>(&mut conn)?;
@@ -168,7 +170,9 @@ pub fn export_servers(pool: &DbPool) -> Result<String, ConfigError> {
 
 pub fn import_servers(pool: &DbPool, json: &str) -> Result<ImportResult, ConfigError> {
     let payload: ImportPayload = serde_json::from_str(json)?;
-    let mut conn = pool.get().map_err(|error| ConfigError::Pool(error.to_string()))?;
+    let mut conn = pool
+        .get()
+        .map_err(|error| ConfigError::Pool(error.to_string()))?;
 
     conn.transaction::<ImportResult, ConfigError, _>(|conn| {
         let mut result = ImportResult::default();
@@ -178,14 +182,23 @@ pub fn import_servers(pool: &DbPool, json: &str) -> Result<ImportResult, ConfigE
             .into_iter()
             .collect();
 
-        import_groups(conn, payload.groups, &mut known_group_ids, &mut result.errors)?;
+        import_groups(
+            conn,
+            payload.groups,
+            &mut known_group_ids,
+            &mut result.errors,
+        )?;
 
         let stored_servers = servers::table.load::<Server>(conn)?;
-        let mut known_server_ids: HashSet<String> =
-            stored_servers.iter().map(|server| server.id.clone()).collect();
+        let mut known_server_ids: HashSet<String> = stored_servers
+            .iter()
+            .map(|server| server.id.clone())
+            .collect();
         let mut known_fingerprints: HashSet<String> = stored_servers
             .iter()
-            .map(|server| server_fingerprint(&server.name, &server.host, server.port, &server.username))
+            .map(|server| {
+                server_fingerprint(&server.name, &server.host, server.port, &server.username)
+            })
             .collect();
 
         for server in payload.servers {
@@ -193,7 +206,10 @@ pub fn import_servers(pool: &DbPool, json: &str) -> Result<ImportResult, ConfigE
             let normalized_host = server.host.trim().to_string();
             let normalized_username = server.username.trim().to_string();
 
-            if normalized_name.is_empty() || normalized_host.is_empty() || normalized_username.is_empty() {
+            if normalized_name.is_empty()
+                || normalized_host.is_empty()
+                || normalized_username.is_empty()
+            {
                 result.skipped += 1;
                 result
                     .errors
@@ -219,8 +235,12 @@ pub fn import_servers(pool: &DbPool, json: &str) -> Result<ImportResult, ConfigE
             }
 
             let requested_group_id = normalize_optional_text(server.group_id);
-            let group_id = requested_group_id.clone().filter(|group_id| known_group_ids.contains(group_id));
-            if let Some(missing_group_id) = requested_group_id.filter(|group_id| !known_group_ids.contains(group_id)) {
+            let group_id = requested_group_id
+                .clone()
+                .filter(|group_id| known_group_ids.contains(group_id));
+            if let Some(missing_group_id) =
+                requested_group_id.filter(|group_id| !known_group_ids.contains(group_id))
+            {
                 result.errors.push(format!(
                     "Server '{}' referenced missing group '{}'; imported without a group.",
                     normalized_name, missing_group_id

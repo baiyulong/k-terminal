@@ -2,7 +2,9 @@ use serde::Serialize;
 use tauri::State;
 
 use crate::db::{get_db_path, DbPool};
-use crate::managers::config_manager::{export_servers, get_config_dir, import_servers, ImportResult};
+use crate::managers::config_manager::{
+    export_servers, get_config_dir, import_servers, ImportResult,
+};
 
 #[derive(Debug, Serialize)]
 pub struct AppInfo {

@@ -36,10 +36,7 @@ pub fn get_group(pool: State<'_, DbPool>, id: String) -> Result<Group, String> {
 }
 
 #[tauri::command]
-pub fn create_group(
-    pool: State<'_, DbPool>,
-    request: CreateGroupRequest,
-) -> Result<Group, String> {
+pub fn create_group(pool: State<'_, DbPool>, request: CreateGroupRequest) -> Result<Group, String> {
     let new_group = NewGroup {
         id: String::new(),
         name: request.name,

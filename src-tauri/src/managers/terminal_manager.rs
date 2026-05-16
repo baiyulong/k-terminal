@@ -318,12 +318,14 @@ where
     let server = ServerManager::get(pool, server_id)?;
     let ssh_command = generate_ssh_command(&server)?;
     let profile = resolve_launch_profile(pool, &server, platform)?;
-    let rendered_args = replace_template_variables(
-        &profile.args_template,
-        &server,
+    let rendered_args =
+        replace_template_variables(&profile.args_template, &server, &ssh_command.full_command);
+    let request = build_launch_request(
+        &profile,
         &ssh_command.full_command,
-    );
-    let request = build_launch_request(&profile, &ssh_command.full_command, &rendered_args, platform)?;
+        &rendered_args,
+        platform,
+    )?;
 
     spawn_terminal(&request)?;
     ServerManager::update_last_connected(pool, server_id)?;
@@ -684,8 +686,8 @@ fn current_platform() -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::{
-        current_platform, default_profiles_for_platform, get_current_platform, launch_terminal_with,
-        parse_args_template, LaunchRequest, TerminalManager,
+        current_platform, default_profiles_for_platform, get_current_platform,
+        launch_terminal_with, parse_args_template, LaunchRequest, TerminalManager,
     };
     use crate::db::{
         models::{NewConnectionLog, NewServer, NewTerminalProfile},
@@ -882,7 +884,13 @@ mod tests {
     #[test]
     fn launch_terminal_uses_selected_profile_and_logs_connection() {
         let pool = test_pool("terminal-launch-selected-profile");
-        let profile_id = insert_profile(&pool, "Custom", "fake-terminal", "-e {{SSH_COMMAND}}", false);
+        let profile_id = insert_profile(
+            &pool,
+            "Custom",
+            "fake-terminal",
+            "-e {{SSH_COMMAND}}",
+            false,
+        );
         let server_id = insert_server(&pool, Some(profile_id));
         let captured = Arc::new(Mutex::new(Vec::<LaunchRequest>::new()));
         let captured_spawn = Arc::clone(&captured);
@@ -897,7 +905,9 @@ mod tests {
         assert_eq!(launches.len(), 1);
         assert_eq!(launches[0].command, "fake-terminal");
         assert_eq!(launches[0].args.first().map(String::as_str), Some("-e"));
-        assert!(launches[0].ssh_command.starts_with("ssh alice@example.com -p 2222"));
+        assert!(launches[0]
+            .ssh_command
+            .starts_with("ssh alice@example.com -p 2222"));
 
         let server = ServerManager::get(&pool, &server_id).unwrap();
         assert!(server.last_connected_at.is_some());

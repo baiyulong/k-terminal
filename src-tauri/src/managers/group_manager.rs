@@ -109,7 +109,8 @@ impl GroupManager {
                 changes.parent_id = Some(normalized_parent_id);
             }
 
-            if changes.name.is_none() && changes.parent_id.is_none() && changes.sort_order.is_none() {
+            if changes.name.is_none() && changes.parent_id.is_none() && changes.sort_order.is_none()
+            {
                 return fetch_group(conn, &group_id);
             }
 
@@ -303,7 +304,10 @@ fn validate_parent_target(
 
     if let Some(current_group_id) = current_group_id {
         let descendant_ids = collect_descendant_ids(&all_groups, current_group_id);
-        if descendant_ids.iter().any(|descendant_id| descendant_id == parent_id) {
+        if descendant_ids
+            .iter()
+            .any(|descendant_id| descendant_id == parent_id)
+        {
             return Err(GroupError::InvalidParent(
                 "A group cannot be moved inside one of its descendants".to_string(),
             ));

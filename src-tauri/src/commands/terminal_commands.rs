@@ -1,7 +1,9 @@
 use serde::Deserialize;
 use tauri::State;
 
-use crate::db::models::{ConnectionLog, NewTerminalProfile, TerminalProfile, UpdateTerminalProfile};
+use crate::db::models::{
+    ConnectionLog, NewTerminalProfile, TerminalProfile, UpdateTerminalProfile,
+};
 use crate::db::DbPool;
 use crate::managers::terminal_manager::{DetectedTerminal, TerminalManager};
 

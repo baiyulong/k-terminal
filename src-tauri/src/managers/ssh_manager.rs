@@ -30,7 +30,11 @@ struct PortForward {
 
 pub fn generate_ssh_command(server: &Server) -> Result<SshCommand, SshError> {
     let destination = format!("{}@{}", server.username, server.host);
-    let mut parts = vec![format!("ssh {} -p {}", shell_escape(&destination), server.port)];
+    let mut parts = vec![format!(
+        "ssh {} -p {}",
+        shell_escape(&destination),
+        server.port
+    )];
 
     if server.auth_type == "key" {
         let private_key_path = server
