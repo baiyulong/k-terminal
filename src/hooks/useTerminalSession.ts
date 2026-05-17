@@ -32,6 +32,7 @@ export function useTerminalActions() {
       const server = useServerStore.getState().servers.find((s) => s.id === serverId);
       const settings = useSettingsStore.getState();
 
+      const targetHost = serverId === LOCAL_MACHINE_ID ? "localhost" : (server?.host ?? "");
       const proxy = resolveProxy(
         server?.proxy_type ?? "global",
         server?.proxy_host,
@@ -42,7 +43,7 @@ export function useTerminalActions() {
           proxyPort: settings.proxyPort,
           proxyBypass: settings.proxyBypass,
         },
-        server?.host ?? "",
+        targetHost,
       );
 
       const channel = createChannel((sessionId, status, reason) => {
