@@ -28,7 +28,6 @@ export function TerminalPage({ onOpenSettings }: TerminalPageProps) {
   const setActiveSession = useTerminalSessionStore(
     (state) => state.setActiveSession,
   );
-  const removeSession = useTerminalSessionStore((state) => state.removeSession);
 
   const { connect, disconnect } = useTerminalActions();
 
@@ -38,7 +37,6 @@ export function TerminalPage({ onOpenSettings }: TerminalPageProps) {
 
   const handleCloseTab = async (sessionId: string) => {
     await disconnect(sessionId);
-    removeSession(sessionId);
   };
 
   const handleAddTab = () => {

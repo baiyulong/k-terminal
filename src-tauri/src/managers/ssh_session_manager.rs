@@ -6,7 +6,7 @@ use russh::keys::{load_secret_key, PrivateKeyWithHashAlg};
 use russh::ChannelMsg;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{mpsc, oneshot, Mutex};
 
 // ── Public event types (emitted to frontend via Tauri) ──────────────────────
 
@@ -33,6 +33,8 @@ pub struct SshSessionHandle {
     pub input_tx: mpsc::Sender<Vec<u8>>,
     /// Send (cols, rows) resize events to the SSH channel
     pub resize_tx: mpsc::Sender<(u16, u16)>,
+    /// Signal the pump loop to exit gracefully
+    pub abort_tx: oneshot::Sender<()>,
 }
 
 // ── Manager ─────────────────────────────────────────────────────────────────
@@ -56,7 +58,12 @@ impl SshSessionManager {
 
     pub async fn remove(&self, session_id: &str) -> bool {
         let mut sessions = self.sessions.lock().await;
-        sessions.remove(session_id).is_some()
+        if let Some(handle) = sessions.remove(session_id) {
+            let _ = handle.abort_tx.send(());
+            true
+        } else {
+            false
+        }
     }
 
     pub async fn send_input(&self, session_id: &str, data: Vec<u8>) -> bool {
@@ -207,6 +214,7 @@ async fn run_session(
     // 4. Register session with input/resize channels
     let (input_tx, mut input_rx) = mpsc::channel::<Vec<u8>>(256);
     let (resize_tx, mut resize_rx) = mpsc::channel::<(u16, u16)>(32);
+    let (abort_tx, mut abort_rx) = oneshot::channel::<()>();
 
     manager
         .add(SshSessionHandle {
@@ -214,6 +222,7 @@ async fn run_session(
             server_id: config.server_id.clone(),
             input_tx,
             resize_tx,
+            abort_tx,
         })
         .await;
 
@@ -250,6 +259,7 @@ async fn run_session(
             Some((cols, rows)) = resize_rx.recv() => {
                 let _ = channel.window_change(cols as u32, rows as u32, 0, 0).await;
             }
+            _ = &mut abort_rx => break,
         }
     }
 

@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   AppInfo,
-  ConnectionLog,
   CreateGroupRequest,
   CreateServerRequest,
   CreateTerminalProfileRequest,
@@ -54,12 +53,6 @@ export const sshApi = {
     invoke<SshCommand>("generate_ssh_command", { serverId }),
   getCommandPreview: (serverId: string) =>
     invoke<string>("get_ssh_command_preview", { serverId }),
-};
-
-export const terminalApi = {
-  launch: (serverId: string) => invoke<void>("launch_terminal", { serverId }),
-  getRecentConnections: (limit?: number) =>
-    invoke<ConnectionLog[]>("get_recent_connections", { limit }),
 };
 
 export const terminalProfileApi = {

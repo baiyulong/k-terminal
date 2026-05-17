@@ -29,16 +29,18 @@ export function useTerminalDataListener(
     if (!sessionId) return;
 
     let unlisten: (() => void) | undefined;
+    let cancelled = false;
 
     listen<TerminalDataPayload>("terminal:data", (event) => {
       if (event.payload.session_id === sessionId) {
         onData(new Uint8Array(event.payload.data));
       }
     }).then((fn) => {
-      unlisten = fn;
+      if (cancelled) fn(); else unlisten = fn;
     });
 
     return () => {
+      cancelled = true;
       unlisten?.();
     };
   }, [sessionId, onData]);
@@ -55,15 +57,17 @@ export function useTerminalStatusListener() {
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
+    let cancelled = false;
 
     listen<TerminalStatusPayload>("terminal:status", (event) => {
       const { session_id, status, reason } = event.payload;
       updateSessionStatus(session_id, status, reason);
     }).then((fn) => {
-      unlisten = fn;
+      if (cancelled) fn(); else unlisten = fn;
     });
 
     return () => {
+      cancelled = true;
       unlisten?.();
     };
   }, [updateSessionStatus]);
@@ -92,7 +96,11 @@ export function useTerminalActions() {
 
   const disconnect = useCallback(
     async (sessionId: string) => {
-      await terminalSessionApi.disconnect(sessionId);
+      try {
+        await terminalSessionApi.disconnect(sessionId);
+      } catch {
+        // Session may have already been removed from backend (e.g. server closed connection)
+      }
       removeSession(sessionId);
     },
     [removeSession],
