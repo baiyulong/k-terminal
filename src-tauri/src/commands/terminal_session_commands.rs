@@ -3,6 +3,7 @@ use tauri::ipc::Channel;
 use uuid::Uuid;
 
 use crate::db::DbPool;
+use crate::managers::local_pty_manager::LocalPtyManager;
 use crate::managers::server_manager::ServerManager;
 use crate::managers::ssh_session_manager::{
     establish_session, ProxyConfig, SshAuthMethod, SshConnectConfig, SshSessionManager, TerminalChannelMessage,
@@ -86,30 +87,60 @@ pub async fn disconnect_ssh_session(
 }
 
 #[tauri::command]
+pub async fn connect_local_session(
+    channel: tauri::ipc::Channel<TerminalChannelMessage>,
+    cols: Option<u16>,
+    rows: Option<u16>,
+    proxy: Option<ProxyConfig>,
+    state: tauri::State<'_, LocalPtyManager>,
+) -> Result<String, String> {
+    let cols = cols.unwrap_or(80);
+    let rows = rows.unwrap_or(24);
+    let session_id = Uuid::new_v4().to_string();
+    state.connect(session_id.clone(), channel, cols, rows, proxy)?;
+    Ok(session_id)
+}
+
+#[tauri::command]
+pub async fn disconnect_local_session(
+    session_id: String,
+    state: tauri::State<'_, LocalPtyManager>,
+) -> Result<(), String> {
+    state.remove(&session_id);
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn terminal_input(
-    ssh_manager: State<'_, SshSessionManager>,
     session_id: String,
     data: Vec<u8>,
+    ssh_state: tauri::State<'_, SshSessionManager>,
+    local_state: tauri::State<'_, LocalPtyManager>,
 ) -> Result<(), String> {
-    let sent = ssh_manager.send_input(&session_id, data).await;
-    if sent {
-        Ok(())
-    } else {
-        Err(format!("Failed to send input to session '{}'", session_id))
+    // Try SSH sessions first, then local PTY
+    if ssh_state.send_input(&session_id, data.clone()).await {
+        return Ok(());
     }
+    if local_state.send_input(&session_id, data) {
+        return Ok(());
+    }
+    Err(format!("Session not found: {}", session_id))
 }
 
 #[tauri::command]
 pub async fn terminal_resize(
-    ssh_manager: State<'_, SshSessionManager>,
     session_id: String,
     cols: u16,
     rows: u16,
+    ssh_state: tauri::State<'_, SshSessionManager>,
+    local_state: tauri::State<'_, LocalPtyManager>,
 ) -> Result<(), String> {
-    let resized = ssh_manager.send_resize(&session_id, cols, rows).await;
-    if resized {
-        Ok(())
-    } else {
-        Err(format!("Failed to resize session '{}'", session_id))
+    // Try SSH sessions first, then local PTY
+    if ssh_state.send_resize(&session_id, cols, rows).await {
+        return Ok(());
     }
+    if local_state.send_resize(&session_id, cols, rows) {
+        return Ok(());
+    }
+    Err(format!("Session not found: {}", session_id))
 }

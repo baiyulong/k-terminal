@@ -4,17 +4,20 @@ pub mod managers;
 pub mod security;
 
 use db::establish_connection_pool;
+use managers::local_pty_manager::LocalPtyManager;
 use managers::ssh_session_manager::SshSessionManager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let pool = establish_connection_pool();
     let ssh_manager = SshSessionManager::new();
+    let local_pty_manager = LocalPtyManager::new();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(pool)
         .manage(ssh_manager)
+        .manage(local_pty_manager)
         .invoke_handler(tauri::generate_handler![
             commands::search_commands::search_servers,
             commands::server_commands::list_servers,
@@ -51,6 +54,8 @@ pub fn run() {
             // New embedded terminal commands
             commands::terminal_session_commands::connect_ssh_session,
             commands::terminal_session_commands::disconnect_ssh_session,
+            commands::terminal_session_commands::connect_local_session,
+            commands::terminal_session_commands::disconnect_local_session,
             commands::terminal_session_commands::terminal_input,
             commands::terminal_session_commands::terminal_resize,
         ])
