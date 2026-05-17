@@ -56,16 +56,21 @@ impl LocalPtyManager {
         cols: u16,
         rows: u16,
         proxy: Option<ProxyConfig>,
+        shell: Option<String>,
     ) -> Result<(), String> {
         let pty_system = native_pty_system();
         let size = PtySize { rows, cols, pixel_width: 0, pixel_height: 0 };
         let pair = pty_system.openpty(size).map_err(|e| e.to_string())?;
 
-        // Detect the user's preferred shell
-        #[cfg(windows)]
-        let shell = std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string());
-        #[cfg(not(windows))]
-        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
+        // Use caller-provided shell if specified, otherwise auto-detect
+        let shell = shell
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| {
+                #[cfg(windows)]
+                { std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string()) }
+                #[cfg(not(windows))]
+                { std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string()) }
+            });
 
         let mut cmd = CommandBuilder::new(&shell);
         cmd.env("TERM", "xterm-256color");

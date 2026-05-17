@@ -93,12 +93,13 @@ pub async fn connect_local_session(
     cols: Option<u16>,
     rows: Option<u16>,
     proxy: Option<ProxyConfig>,
+    shell: Option<String>,
     local_state: tauri::State<'_, LocalPtyManager>,
 ) -> Result<String, String> {
     let cols = cols.unwrap_or(80);
     let rows = rows.unwrap_or(24);
     let session_id = Uuid::new_v4().to_string();
-    local_state.connect(session_id.clone(), channel, cols, rows, proxy)?;
+    local_state.connect(session_id.clone(), channel, cols, rows, proxy, shell)?;
     Ok(session_id)
 }
 
