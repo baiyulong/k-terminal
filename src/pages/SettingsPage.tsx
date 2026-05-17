@@ -325,11 +325,13 @@ export function SettingsPage({
                 className={inputClassName + " w-56"}
                 value={dropdownValue}
                 onChange={(e) => {
+                  console.log("[k-terminal] Shell select onChange:", JSON.stringify(e.target.value));
                   if (e.target.value === "__custom__") {
                     if (!isCustomShell) setLocalShell("");
                   } else {
                     setLocalShell(e.target.value);
                   }
+                  console.log("[k-terminal] localStorage after set:", window.localStorage.getItem("kterminal.local.shell"));
                 }}
               >
                 {shellPresets.map((p) => (
