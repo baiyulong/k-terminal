@@ -50,7 +50,7 @@ export function useTerminalActions() {
         updateSessionStatus(sessionId, status, reason);
       });
       const sessionId = serverId === LOCAL_MACHINE_ID
-        ? await terminalSessionApi.connectLocal(channel, proxy)
+        ? await terminalSessionApi.connectLocal(channel, proxy, undefined, undefined, settings.localShell || null)
         : await terminalSessionApi.connect(serverId, channel, proxy);
       storeChannel(sessionId, channel);
       addSession({

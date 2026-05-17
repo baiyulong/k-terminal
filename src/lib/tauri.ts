@@ -99,8 +99,9 @@ export const terminalSessionApi = {
     proxy?: ProxyConfig | null,
     cols?: number,
     rows?: number,
+    shell?: string | null,
   ): Promise<string> =>
-    invoke("connect_local_session", { channel, proxy: proxy ?? null, cols, rows }),
+    invoke("connect_local_session", { channel, proxy: proxy ?? null, cols, rows, shell: shell ?? null }),
 
   disconnect: (sessionId: string): Promise<void> =>
     invoke("disconnect_ssh_session", { sessionId }),
