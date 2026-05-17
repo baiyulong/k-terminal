@@ -312,61 +312,54 @@ export function SettingsPage({
           </div>
 
           {/* Local Shell */}
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium text-[hsl(var(--foreground))]">
-                Local Shell
-              </p>
-              <p className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">
-                Shell launched for Local Machine sessions
-              </p>
-            </div>
-            <div className="flex flex-col items-end gap-1.5">
-              <div className="flex flex-col gap-1 w-56">
-                {shellPresets.filter((p) => p.value !== "__custom__").map((p) => (
-                  <button
-                    key={p.value}
-                    type="button"
-                    onClick={() => {
-                      console.log("[k-terminal] Shell button clicked:", JSON.stringify(p.value));
-                      setLocalShell(p.value);
-                    }}
-                    className={[
-                      "w-full rounded-xl px-3 py-1.5 text-left text-sm transition",
-                      localShell === p.value
-                        ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-medium"
-                        : "border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))]",
-                    ].join(" ")}
-                  >
-                    {p.label}
-                  </button>
-                ))}
+          <div className="mt-2">
+            <p className="text-sm font-medium text-[hsl(var(--foreground))]">Local Shell</p>
+            <p className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">
+              Shell launched for Local Machine sessions
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {shellPresets.filter((p) => p.value !== "__custom__").map((p) => (
                 <button
+                  key={p.value}
                   type="button"
                   onClick={() => {
-                    console.log("[k-terminal] Shell custom button clicked");
-                    if (!isCustomShell) setLocalShell("");
+                    console.log("[k-terminal] Shell button clicked:", JSON.stringify(p.value));
+                    setLocalShell(p.value);
                   }}
                   className={[
-                    "w-full rounded-xl px-3 py-1.5 text-left text-sm transition",
-                    isCustomShell
+                    "rounded-xl px-3 py-1 text-sm transition",
+                    localShell === p.value
                       ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-medium"
                       : "border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))]",
                   ].join(" ")}
                 >
-                  Custom…
+                  {p.label}
                 </button>
-              </div>
-              {isCustomShell && (
-                <input
-                  type="text"
-                  className={inputClassName + " w-56"}
-                  placeholder="C:\path\to\shell.exe or /usr/bin/zsh"
-                  value={localShell}
-                  onChange={(e) => setLocalShell(e.target.value)}
-                />
-              )}
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isCustomShell) setLocalShell("");
+                }}
+                className={[
+                  "rounded-xl px-3 py-1 text-sm transition",
+                  isCustomShell
+                    ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-medium"
+                    : "border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))]",
+                ].join(" ")}
+              >
+                Custom…
+              </button>
             </div>
+            {isCustomShell && (
+              <input
+                type="text"
+                className={inputClassName + " mt-2"}
+                placeholder={isWindows ? "C:\\path\\to\\shell.exe" : "/usr/bin/zsh"}
+                value={localShell}
+                onChange={(e) => setLocalShell(e.target.value)}
+              />
+            )}
           </div>
         </section>
 
