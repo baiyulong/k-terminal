@@ -20,6 +20,9 @@ export interface Server {
   compression: boolean;
   agent_forward: boolean;
   port_forwards?: string;
+  proxy_type: "global" | "none" | "http" | "socks5";
+  proxy_host?: string;
+  proxy_port?: number;
   last_connected_at?: string;
   created_at: string;
   updated_at: string;
@@ -45,6 +48,9 @@ export interface CreateServerRequest {
   compression?: boolean;
   agent_forward?: boolean;
   port_forwards?: string;
+  proxy_type?: string;
+  proxy_host?: string;
+  proxy_port?: number;
 }
 
 export interface UpdateServerRequest {
@@ -68,6 +74,9 @@ export interface UpdateServerRequest {
   compression?: boolean;
   agent_forward?: boolean;
   port_forwards?: string;
+  proxy_type?: string;
+  proxy_host?: string;
+  proxy_port?: number;
 }
 
 export interface SshCommand {
