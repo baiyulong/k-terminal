@@ -67,7 +67,7 @@ export function ServerDetail({
               aria-hidden="true"
               viewBox="0 0 20 20"
               fill="none"
-              className="h-6 w-6 shrink-0 text-green-400"
+              className="h-4 w-4 shrink-0"
               stroke="currentColor"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -87,8 +87,9 @@ export function ServerDetail({
         <div className="px-6 py-6">
           <button
             type="button"
+            aria-label="Connect to Local Machine"
             onClick={() => onConnect(LOCAL_MACHINE_SERVER)}
-            className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2 text-sm font-semibold text-[hsl(var(--primary-foreground))] transition hover:opacity-90"
+            className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2 text-sm font-semibold text-[hsl(var(--primary-foreground))] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             Connect
           </button>
