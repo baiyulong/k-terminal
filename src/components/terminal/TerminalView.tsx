@@ -55,6 +55,31 @@ export function TerminalView({ sessionId, isActive }: TerminalViewProps) {
       fontSize,
       cursorBlink: true,
       allowProposedApi: true,
+      // Allow Ctrl+C/V to be intercepted by customKeyEventHandler below
+      // instead of sending raw control codes
+      macOptionIsMeta: false,
+    });
+
+    // Ctrl+C: copy selection; Ctrl+V: paste from clipboard
+    // Ctrl+Shift+C/V are also supported as alternatives
+    terminal.attachCustomKeyEventHandler((ev) => {
+      const isCtrl = ev.ctrlKey;
+      if (ev.type !== "keydown" || !isCtrl) return true;
+
+      if (ev.key === "c" && terminal.hasSelection()) {
+        // Copy selection — don't send ^C to shell when text is selected
+        navigator.clipboard?.writeText(terminal.getSelection()).catch(() => {});
+        return false;
+      }
+
+      if (ev.key === "v") {
+        navigator.clipboard?.readText().then((text) => {
+          if (text) terminal.paste(text);
+        }).catch(() => {});
+        return false;
+      }
+
+      return true;
     });
 
     const fitAddon = new FitAddon();

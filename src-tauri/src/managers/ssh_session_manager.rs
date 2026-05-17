@@ -244,7 +244,11 @@ async fn run_session(
     let channel = config.channel.clone();
 
     // 1. TCP connect + SSH handshake
-    let russh_config = Arc::new(Config::default());
+    let russh_config = Arc::new(Config {
+        keepalive_interval: Some(std::time::Duration::from_secs(30)),
+        keepalive_max: 5,
+        ..Config::default()
+    });
     let addr = format!("{}:{}", config.host, config.port);
     eprintln!("[ssh] Connecting to {}", addr);
     let stream = build_proxied_stream(&config.host, config.port, config.proxy.as_ref())
