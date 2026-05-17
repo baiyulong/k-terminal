@@ -1,8 +1,5 @@
 import { useTerminalSessionStore } from "@/stores/terminalSessionStore";
-import {
-  useTerminalActions,
-  useTerminalStatusListener,
-} from "@/hooks/useTerminalSession";
+import { useTerminalActions } from "@/hooks/useTerminalSession";
 import { useServersQuery } from "@/hooks/useServers";
 import { useServerStore } from "@/stores/serverStore";
 import type { Server } from "@/lib/types";
@@ -15,9 +12,6 @@ interface TerminalPageProps {
 }
 
 export function TerminalPage({ onOpenSettings }: TerminalPageProps) {
-  // Register global status listener (updates session statuses in store)
-  useTerminalStatusListener();
-
   useServersQuery(); // keep server list fresh
   const servers = useServerStore((state) => state.servers);
 
