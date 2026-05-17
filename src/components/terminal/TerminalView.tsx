@@ -1,0 +1,123 @@
+import { useCallback, useEffect, useRef } from "react";
+import { Terminal } from "@xterm/xterm";
+import { FitAddon } from "@xterm/addon-fit";
+import "@xterm/xterm/css/xterm.css";
+import { useTerminalDataListener, useTerminalActions } from "@/hooks/useTerminalSession";
+
+interface TerminalViewProps {
+  sessionId: string;
+  isActive: boolean;
+}
+
+export function TerminalView({ sessionId, isActive }: TerminalViewProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const terminalRef = useRef<Terminal | null>(null);
+  const fitAddonRef = useRef<FitAddon | null>(null);
+  const { sendInput, resize } = useTerminalActions();
+
+  // Create xterm instance on mount
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const terminal = new Terminal({
+      theme: {
+        background: "#0d1117",
+        foreground: "#e6edf3",
+        cursor: "#e6edf3",
+        selectionBackground: "#264f78",
+        black: "#0d1117",
+        brightBlack: "#6e7681",
+        red: "#ff7b72",
+        brightRed: "#ffa198",
+        green: "#3fb950",
+        brightGreen: "#56d364",
+        yellow: "#d29922",
+        brightYellow: "#e3b341",
+        blue: "#58a6ff",
+        brightBlue: "#79c0ff",
+        magenta: "#bc8cff",
+        brightMagenta: "#d2a8ff",
+        cyan: "#76e3ea",
+        brightCyan: "#b3deef",
+        white: "#b1bac4",
+        brightWhite: "#f0f6fc",
+      },
+      fontFamily: '"Cascadia Code", "Fira Code", "JetBrains Mono", monospace',
+      fontSize: 13,
+      cursorBlink: true,
+      allowProposedApi: true,
+    });
+
+    const fitAddon = new FitAddon();
+    terminal.loadAddon(fitAddon);
+    terminal.open(container);
+    fitAddon.fit();
+
+    terminalRef.current = terminal;
+    fitAddonRef.current = fitAddon;
+
+    // Route keyboard input → backend
+    const inputDispose = terminal.onData((data) => {
+      sendInput(sessionId, new TextEncoder().encode(data));
+    });
+
+    // Route binary input (e.g. function keys) → backend
+    const binaryDispose = terminal.onBinary((data) => {
+      const bytes = new Uint8Array(data.length);
+      for (let i = 0; i < data.length; i++) {
+        bytes[i] = data.charCodeAt(i) & 0xff;
+      }
+      sendInput(sessionId, bytes);
+    });
+
+    return () => {
+      inputDispose.dispose();
+      binaryDispose.dispose();
+      terminal.dispose();
+      terminalRef.current = null;
+      fitAddonRef.current = null;
+    };
+  }, [sessionId, sendInput]);
+
+  // Fit when the tab becomes active
+  useEffect(() => {
+    if (!isActive) return;
+    const raf = requestAnimationFrame(() => {
+      fitAddonRef.current?.fit();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [isActive]);
+
+  // Resize observer → PTY resize
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new ResizeObserver(() => {
+      const fitAddon = fitAddonRef.current;
+      const terminal = terminalRef.current;
+      if (!fitAddon || !terminal) return;
+      fitAddon.fit();
+      resize(sessionId, terminal.cols, terminal.rows);
+    });
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [sessionId, resize]);
+
+  // Receive terminal data from SSH server
+  const handleData = useCallback((data: Uint8Array) => {
+    terminalRef.current?.write(data);
+  }, []);
+
+  useTerminalDataListener(sessionId, handleData);
+
+  return (
+    <div
+      ref={containerRef}
+      style={{ display: isActive ? "block" : "none" }}
+      className="h-full w-full overflow-hidden bg-[#0d1117]"
+    />
+  );
+}
