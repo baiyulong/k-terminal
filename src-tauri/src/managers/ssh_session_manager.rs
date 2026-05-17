@@ -89,6 +89,7 @@ impl Default for SshSessionManager {
 #[derive(Debug, Clone)]
 pub struct SshConnectConfig {
     pub session_id: String,
+    pub server_id: String,
     pub host: String,
     pub port: u16,
     pub username: String,
@@ -130,6 +131,16 @@ pub async fn establish_session(
 ) {
     let session_id = config.session_id.clone();
     let app_emit = app.clone();
+
+    // Emit "connecting" immediately so frontend shows yellow dot
+    let _ = app.emit(
+        "terminal:status",
+        TerminalStatusEvent {
+            session_id: session_id.clone(),
+            status: "connecting".to_string(),
+            reason: None,
+        },
+    );
 
     if let Err(err) = run_session(app, manager.clone(), config).await {
         let _ = app_emit.emit(
@@ -200,7 +211,7 @@ async fn run_session(
     manager
         .add(SshSessionHandle {
             id: session_id.clone(),
-            server_id: String::new(),
+            server_id: config.server_id.clone(),
             input_tx,
             resize_tx,
         })
@@ -232,7 +243,9 @@ async fn run_session(
                 }
             }
             Some(data) = input_rx.recv() => {
-                let _ = channel.data(std::io::Cursor::new(data)).await;
+                if channel.data(data.as_slice()).await.is_err() {
+                    break;
+                }
             }
             Some((cols, rows)) = resize_rx.recv() => {
                 let _ = channel.window_change(cols as u32, rows as u32, 0, 0).await;
