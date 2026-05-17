@@ -49,8 +49,12 @@ export function useTerminalActions() {
       const channel = createChannel((sessionId, status, reason) => {
         updateSessionStatus(sessionId, status, reason);
       });
+      // Diagnostic: log what shell value is in Zustand store vs localStorage
+      const lsShell = typeof window !== "undefined" ? window.localStorage.getItem("kterminal.local.shell") : null;
+      console.log("[k-terminal] connect localShell: store=", JSON.stringify(settings.localShell), " localStorage=", JSON.stringify(lsShell));
+      const shellToUse = lsShell || null;
       const sessionId = serverId === LOCAL_MACHINE_ID
-        ? await terminalSessionApi.connectLocal(channel, proxy, undefined, undefined, settings.localShell || null)
+        ? await terminalSessionApi.connectLocal(channel, proxy, undefined, undefined, shellToUse)
         : await terminalSessionApi.connect(serverId, channel, proxy);
       storeChannel(sessionId, channel);
       addSession({
