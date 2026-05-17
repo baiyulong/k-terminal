@@ -278,6 +278,9 @@ pub fn import_servers(pool: &DbPool, json: &str) -> Result<ImportResult, ConfigE
                     compression: server.compression,
                     agent_forward: server.agent_forward,
                     port_forwards: normalize_optional_text(server.port_forwards),
+                    proxy_type: "global".to_string(),
+                    proxy_host: None,
+                    proxy_port: None,
                 })
                 .execute(conn)?;
 

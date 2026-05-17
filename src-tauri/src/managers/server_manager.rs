@@ -128,6 +128,9 @@ impl ServerManager {
             compression: original.compression,
             agent_forward: original.agent_forward,
             port_forwards: original.port_forwards,
+            proxy_type: original.proxy_type,
+            proxy_host: original.proxy_host,
+            proxy_port: original.proxy_port,
         };
 
         let mut conn = pool.get().map_err(|e| ServerError::Pool(e.to_string()))?;

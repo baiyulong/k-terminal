@@ -65,6 +65,9 @@ pub fn create_server(
         compression: request.compression.unwrap_or(false),
         agent_forward: request.agent_forward.unwrap_or(false),
         port_forwards: request.port_forwards,
+        proxy_type: "global".to_string(),
+        proxy_host: None,
+        proxy_port: None,
     };
 
     ServerManager::create(&pool, new_server).map_err(|e| e.to_string())
