@@ -101,7 +101,6 @@ function App() {
       ) : page === "settings" ? (
         <SettingsPage
           onNavigateHome={() => setPage("home")}
-          onOpenTerminalProfiles={() => {}}
         />
       ) : (
         <TerminalPage onOpenSettings={() => setPage("settings")} />

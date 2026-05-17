@@ -10,7 +10,6 @@ import { useToast } from "@/components/ui/Toast";
 
 interface SettingsPageProps {
   onNavigateHome: () => void;
-  onOpenTerminalProfiles: () => void;
 }
 
 const sectionClassName =
@@ -22,7 +21,6 @@ const buttonClassName =
 
 export function SettingsPage({
   onNavigateHome,
-  onOpenTerminalProfiles,
 }: SettingsPageProps) {
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -180,13 +178,6 @@ export function SettingsPage({
                 Pick a default launcher and manage platform-specific terminal presets.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={onOpenTerminalProfiles}
-              className={buttonClassName}
-            >
-              Manage Profiles
-            </button>
           </div>
 
           <div className="mt-5 grid gap-4 md:grid-cols-[minmax(0,16rem)_1fr] md:items-start">

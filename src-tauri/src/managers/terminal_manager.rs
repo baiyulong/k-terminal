@@ -1,24 +1,17 @@
-use chrono::Utc;
 use diesel::prelude::*;
 use diesel::r2d2;
 use diesel::sqlite::SqliteConnection;
-use log::info;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::ffi::OsString;
-use std::io;
 use std::path::Path;
-use std::process::Command;
 use uuid::Uuid;
 
 use crate::db::models::{
-    ConnectionLog, NewConnectionLog, NewTerminalProfile, Server, TerminalProfile,
-    UpdateTerminalProfile,
+    ConnectionLog, NewTerminalProfile, TerminalProfile, UpdateTerminalProfile,
 };
 use crate::db::schema::{connection_logs, terminal_profiles};
 use crate::db::DbPool;
-use crate::managers::server_manager::{ServerError, ServerManager};
-use crate::managers::ssh_manager::{generate_ssh_command, replace_template_variables, SshError};
 
 #[derive(Debug, thiserror::Error)]
 pub enum TerminalManagerError {
@@ -34,33 +27,6 @@ impl From<r2d2::Error> for TerminalManagerError {
     fn from(error: r2d2::Error) -> Self {
         Self::Pool(error.to_string())
     }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum LaunchError {
-    #[error(transparent)]
-    Server(#[from] ServerError),
-    #[error(transparent)]
-    TerminalManager(#[from] TerminalManagerError),
-    #[error(transparent)]
-    Ssh(#[from] SshError),
-    #[error("No terminal profile available for platform: {0}")]
-    NoProfileAvailable(String),
-    #[error("Invalid terminal args template: {0}")]
-    InvalidArgsTemplate(String),
-    #[error("Terminal application not found: {0}")]
-    TerminalNotFound(String),
-    #[error("Failed to launch terminal process: {0}")]
-    Spawn(String),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct LaunchRequest {
-    command: String,
-    args: Vec<String>,
-    profile_name: String,
-    platform: String,
-    ssh_command: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -284,11 +250,6 @@ impl TerminalManager {
         })
     }
 
-    pub fn launch_terminal(pool: &DbPool, server_id: &str) -> Result<(), LaunchError> {
-        let platform = get_current_platform();
-        launch_terminal_with(pool, server_id, &platform, spawn_terminal_process)
-    }
-
     pub fn get_recent_connections(
         pool: &DbPool,
         limit: Option<i32>,
@@ -304,196 +265,6 @@ impl TerminalManager {
             .load::<ConnectionLog>(&mut conn)
             .map_err(Into::into)
     }
-}
-
-fn launch_terminal_with<F>(
-    pool: &DbPool,
-    server_id: &str,
-    platform: &str,
-    spawn_terminal: F,
-) -> Result<(), LaunchError>
-where
-    F: Fn(&LaunchRequest) -> Result<(), LaunchError>,
-{
-    let server = ServerManager::get(pool, server_id)?;
-    let ssh_command = generate_ssh_command(&server)?;
-    let profile = resolve_launch_profile(pool, &server, platform)?;
-    let rendered_args =
-        replace_template_variables(&profile.args_template, &server, &ssh_command.full_command);
-    let request = build_launch_request(
-        &profile,
-        &ssh_command.full_command,
-        &rendered_args,
-        platform,
-    )?;
-
-    spawn_terminal(&request)?;
-    ServerManager::update_last_connected(pool, server_id)?;
-    log_connection(pool, server_id)?;
-
-    info!(
-        "Launched terminal profile '{}' for server '{}' ({})",
-        profile.name, server.name, server.host
-    );
-
-    Ok(())
-}
-
-fn resolve_launch_profile(
-    pool: &DbPool,
-    server: &Server,
-    platform: &str,
-) -> Result<TerminalProfile, LaunchError> {
-    if let Some(profile_id) = server
-        .terminal_profile_id
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-    {
-        match TerminalManager::get_profile(pool, profile_id) {
-            Ok(profile) => return Ok(profile),
-            Err(TerminalManagerError::NotFound(_)) => {}
-            Err(error) => return Err(error.into()),
-        }
-    }
-
-    if let Some(profile) = TerminalManager::get_default_profile(pool, platform)? {
-        return Ok(profile);
-    }
-
-    TerminalManager::seed_default_profiles(pool)?;
-
-    TerminalManager::get_default_profile(pool, platform)?
-        .ok_or_else(|| LaunchError::NoProfileAvailable(platform.to_string()))
-}
-
-fn build_launch_request(
-    profile: &TerminalProfile,
-    ssh_command: &str,
-    rendered_args: &str,
-    platform: &str,
-) -> Result<LaunchRequest, LaunchError> {
-    let args = match (platform, profile.name.as_str()) {
-        ("macos", "Terminal.app") => build_macos_script_args("Terminal", ssh_command),
-        ("macos", "iTerm2") => build_macos_script_args("iTerm", ssh_command),
-        _ => parse_args_template(rendered_args)?,
-    };
-
-    Ok(LaunchRequest {
-        command: profile.command.clone(),
-        args,
-        profile_name: profile.name.clone(),
-        platform: platform.to_string(),
-        ssh_command: ssh_command.to_string(),
-    })
-}
-
-fn build_macos_script_args(app_name: &str, ssh_command: &str) -> Vec<String> {
-    let escaped_command = escape_for_applescript(ssh_command);
-    let launch_script = match app_name {
-        "iTerm" => format!(
-            "tell application \"iTerm\" to create window with default profile command \"{escaped_command}\""
-        ),
-        _ => format!(
-            "tell application \"Terminal\" to do script \"{escaped_command}\""
-        ),
-    };
-
-    vec![
-        "-e".to_string(),
-        format!("tell application \"{app_name}\" to activate"),
-        "-e".to_string(),
-        launch_script,
-    ]
-}
-
-fn escape_for_applescript(value: &str) -> String {
-    value.replace('\\', "\\\\").replace('"', "\\\"")
-}
-
-fn parse_args_template(template: &str) -> Result<Vec<String>, LaunchError> {
-    let mut args = Vec::new();
-    let mut current = String::new();
-    let mut quote: Option<char> = None;
-    let mut characters = template.chars().peekable();
-
-    while let Some(character) = characters.next() {
-        match quote {
-            Some(delimiter) => {
-                if character == delimiter {
-                    quote = None;
-                } else if character == '\\' && delimiter == '"' {
-                    if let Some(next_character) = characters.next() {
-                        current.push(next_character);
-                    }
-                } else {
-                    current.push(character);
-                }
-            }
-            None => match character {
-                '\'' | '"' => quote = Some(character),
-                '\\' => {
-                    if let Some(next_character) = characters.next() {
-                        current.push(next_character);
-                    }
-                }
-                character if character.is_whitespace() => {
-                    if !current.is_empty() {
-                        args.push(std::mem::take(&mut current));
-                    }
-                }
-                _ => current.push(character),
-            },
-        }
-    }
-
-    if quote.is_some() {
-        return Err(LaunchError::InvalidArgsTemplate(template.to_string()));
-    }
-
-    if !current.is_empty() {
-        args.push(current);
-    }
-
-    Ok(args)
-}
-
-fn spawn_terminal_process(request: &LaunchRequest) -> Result<(), LaunchError> {
-    let mut command = match request.platform.as_str() {
-        "linux" | "windows" | "macos" => Command::new(&request.command),
-        _ => Command::new(&request.command),
-    };
-    command.args(&request.args);
-
-    command
-        .spawn()
-        .map(|_| ())
-        .map_err(|error| map_spawn_error(&request.command, error))
-}
-
-fn map_spawn_error(command: &str, error: io::Error) -> LaunchError {
-    if error.kind() == io::ErrorKind::NotFound {
-        return LaunchError::TerminalNotFound(command.to_string());
-    }
-
-    LaunchError::Spawn(error.to_string())
-}
-
-fn log_connection(pool: &DbPool, server_id: &str) -> Result<(), TerminalManagerError> {
-    let mut conn = pool
-        .get()
-        .map_err(|error| TerminalManagerError::Pool(error.to_string()))?;
-
-    diesel::insert_into(connection_logs::table)
-        .values(&NewConnectionLog {
-            id: Uuid::new_v4().to_string(),
-            server_id: server_id.to_string(),
-            connected_at: Utc::now().naive_utc(),
-            status: "success".to_string(),
-        })
-        .execute(&mut conn)?;
-
-    Ok(())
 }
 
 fn fetch_profile(
@@ -686,21 +457,19 @@ fn current_platform() -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::{
-        current_platform, default_profiles_for_platform, get_current_platform,
-        launch_terminal_with, parse_args_template, LaunchRequest, TerminalManager,
+        current_platform, default_profiles_for_platform, get_current_platform, TerminalManager,
     };
     use crate::db::{
-        models::{NewConnectionLog, NewServer, NewTerminalProfile},
+        models::{NewConnectionLog, NewServer},
         schema::{connection_logs, servers},
         DbPool, MIGRATIONS,
     };
-    use crate::managers::server_manager::ServerManager;
     use chrono::{Duration, Utc};
     use diesel::prelude::*;
     use diesel::r2d2::{ConnectionManager, Pool};
     use diesel::sqlite::SqliteConnection;
     use diesel_migrations::MigrationHarness;
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
     use uuid::Uuid;
 
     fn test_pool(name: &str) -> DbPool {
@@ -712,31 +481,6 @@ mod tests {
         conn.run_pending_migrations(MIGRATIONS).unwrap();
 
         Arc::new(pool)
-    }
-
-    fn insert_profile(
-        pool: &DbPool,
-        name: &str,
-        command: &str,
-        args_template: &str,
-        is_default: bool,
-    ) -> String {
-        let profile_id = Uuid::new_v4().to_string();
-        let mut conn = pool.get().unwrap();
-
-        diesel::insert_into(crate::db::schema::terminal_profiles::table)
-            .values(&NewTerminalProfile {
-                id: profile_id.clone(),
-                name: name.to_string(),
-                platform: current_platform().to_string(),
-                command: command.to_string(),
-                args_template: args_template.to_string(),
-                is_default,
-            })
-            .execute(&mut conn)
-            .unwrap();
-
-        profile_id
     }
 
     fn insert_server(pool: &DbPool, terminal_profile_id: Option<String>) -> String {
@@ -862,82 +606,6 @@ mod tests {
         let platform = get_current_platform();
 
         assert!(matches!(platform.as_str(), "linux" | "windows" | "macos"));
-    }
-
-    #[test]
-    fn parse_args_template_preserves_quoted_segments() {
-        let parsed = parse_args_template(
-            "-NoExit -Command \"ssh alice@example.com -p 2222 'tmux attach || tmux new'\"",
-        )
-        .unwrap();
-
-        assert_eq!(
-            parsed,
-            vec![
-                "-NoExit".to_string(),
-                "-Command".to_string(),
-                "ssh alice@example.com -p 2222 'tmux attach || tmux new'".to_string(),
-            ]
-        );
-    }
-
-    #[test]
-    fn launch_terminal_uses_selected_profile_and_logs_connection() {
-        let pool = test_pool("terminal-launch-selected-profile");
-        let profile_id = insert_profile(
-            &pool,
-            "Custom",
-            "fake-terminal",
-            "-e {{SSH_COMMAND}}",
-            false,
-        );
-        let server_id = insert_server(&pool, Some(profile_id));
-        let captured = Arc::new(Mutex::new(Vec::<LaunchRequest>::new()));
-        let captured_spawn = Arc::clone(&captured);
-
-        launch_terminal_with(&pool, &server_id, current_platform(), move |request| {
-            captured_spawn.lock().unwrap().push(request.clone());
-            Ok(())
-        })
-        .unwrap();
-
-        let launches = captured.lock().unwrap();
-        assert_eq!(launches.len(), 1);
-        assert_eq!(launches[0].command, "fake-terminal");
-        assert_eq!(launches[0].args.first().map(String::as_str), Some("-e"));
-        assert!(launches[0]
-            .ssh_command
-            .starts_with("ssh alice@example.com -p 2222"));
-
-        let server = ServerManager::get(&pool, &server_id).unwrap();
-        assert!(server.last_connected_at.is_some());
-
-        let logs = TerminalManager::get_recent_connections(&pool, Some(5)).unwrap();
-        assert_eq!(logs.len(), 1);
-        assert_eq!(logs[0].server_id, server_id);
-        assert_eq!(logs[0].status, "success");
-    }
-
-    #[test]
-    fn launch_terminal_seeds_default_profile_when_missing() {
-        let pool = test_pool("terminal-launch-seeds-default");
-        let server_id = insert_server(&pool, None);
-        let captured = Arc::new(Mutex::new(Vec::<LaunchRequest>::new()));
-        let captured_spawn = Arc::clone(&captured);
-
-        launch_terminal_with(&pool, &server_id, current_platform(), move |request| {
-            captured_spawn.lock().unwrap().push(request.clone());
-            Ok(())
-        })
-        .unwrap();
-
-        let launches = captured.lock().unwrap();
-        assert_eq!(launches.len(), 1);
-        assert!(
-            TerminalManager::get_default_profile(&pool, current_platform())
-                .unwrap()
-                .is_some()
-        );
     }
 
     #[test]

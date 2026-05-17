@@ -89,11 +89,6 @@ pub fn seed_default_terminal_profiles(
 }
 
 #[tauri::command]
-pub fn launch_terminal(pool: State<'_, DbPool>, server_id: String) -> Result<(), String> {
-    TerminalManager::launch_terminal(&pool, &server_id).map_err(|error| error.to_string())
-}
-
-#[tauri::command]
 pub fn get_recent_connections(
     pool: State<'_, DbPool>,
     limit: Option<i32>,
