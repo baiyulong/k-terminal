@@ -13,16 +13,18 @@ use crate::managers::ssh_session_manager::{
     ProxyConfig, TerminalChannelMessage, TerminalDataEvent, TerminalStatusEvent,
 };
 
-// Safety: Box<dyn Child> wraps OS process handles (PID / HANDLEs) which are safe
-// to transfer between threads. We only ever access it through a Mutex.
+// Safety: On Unix the backing type is `std::process::Child` which is `Send`.
+// On Windows the backing type holds a `HANDLE` which is valid to transfer between
+// threads per Win32 documentation. The only method called cross-thread is `kill()`,
+// which is a syscall with no aliasing concerns. The `Mutex` wrapper ensures exclusive
+// access.
 struct SendableChild(Box<dyn portable_pty::Child>);
 unsafe impl Send for SendableChild {}
 
 pub struct LocalPtyHandle {
-    pub id: String,
     pub writer: Arc<Mutex<Box<dyn Write + Send>>>,
     pub master: Arc<Mutex<Box<dyn portable_pty::MasterPty + Send>>>,
-    child: Mutex<SendableChild>,
+    child: Arc<Mutex<SendableChild>>,
 }
 
 impl LocalPtyHandle {
@@ -91,17 +93,25 @@ impl LocalPtyManager {
             }
         }
 
-        let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
+        let mut child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
         drop(pair.slave); // slave no longer needed after spawn
 
-        let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
-        let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
+        let writer = pair.master.take_writer().map_err(|e| {
+            let _ = child.kill();
+            e.to_string()
+        })?;
+        let mut reader = pair.master.try_clone_reader().map_err(|e| {
+            let _ = child.kill();
+            e.to_string()
+        })?;
+
+        let child_arc = Arc::new(Mutex::new(SendableChild(child)));
+        let child_for_thread = child_arc.clone();
 
         let handle = LocalPtyHandle {
-            id: session_id.clone(),
             writer: Arc::new(Mutex::new(writer)),
             master: Arc::new(Mutex::new(pair.master)),
-            child: Mutex::new(SendableChild(child)),
+            child: child_arc,
         };
 
         self.sessions.lock().unwrap().insert(session_id.clone(), handle);
@@ -127,6 +137,10 @@ impl LocalPtyManager {
                     }
                 }
             }
+            // Reap the child to prevent zombie processes
+            if let Ok(mut child_guard) = child_for_thread.lock() {
+                let _ = child_guard.0.wait();
+            }
             // Shell exited or PTY closed
             let _ = channel.send(TerminalChannelMessage::Status(TerminalStatusEvent {
                 session_id,
@@ -151,9 +165,12 @@ impl LocalPtyManager {
 
     /// Send raw bytes to the shell's stdin.
     pub fn send_input(&self, session_id: &str, data: Vec<u8>) -> bool {
-        let sessions = self.sessions.lock().unwrap();
-        if let Some(handle) = sessions.get(session_id) {
-            if let Ok(mut writer) = handle.writer.lock() {
+        let writer_arc = {
+            let sessions = self.sessions.lock().unwrap();
+            sessions.get(session_id).map(|h| h.writer.clone())
+        };
+        if let Some(arc) = writer_arc {
+            if let Ok(mut writer) = arc.lock() {
                 return writer.write_all(&data).is_ok();
             }
         }
@@ -162,9 +179,12 @@ impl LocalPtyManager {
 
     /// Resize the PTY to the new dimensions.
     pub fn send_resize(&self, session_id: &str, cols: u16, rows: u16) -> bool {
-        let sessions = self.sessions.lock().unwrap();
-        if let Some(handle) = sessions.get(session_id) {
-            if let Ok(master) = handle.master.lock() {
+        let master_arc = {
+            let sessions = self.sessions.lock().unwrap();
+            sessions.get(session_id).map(|h| h.master.clone())
+        };
+        if let Some(arc) = master_arc {
+            if let Ok(master) = arc.lock() {
                 return master
                     .resize(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
                     .is_ok();
