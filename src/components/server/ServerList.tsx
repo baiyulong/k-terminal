@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { ContextMenu, type ContextMenuPosition } from "@/components/ui/ContextMenu";
+import { LOCAL_MACHINE_ID, LOCAL_MACHINE_SERVER } from "@/lib/constants";
 import type { Server } from "@/lib/types";
 
 interface ServerListProps {
@@ -58,21 +59,54 @@ export function ServerList({
     );
   }
 
-  if (sortedServers.length === 0) {
-    return (
-      <div className="px-4 py-6 text-sm text-[hsl(var(--muted-foreground))]">
-        {searchTerm
-          ? `No servers matched “${searchTerm}”.`
-          : "No servers yet. Add your first server to get started."}
-      </div>
-    );
-  }
+  const isLocalSelected = selectedServerId === LOCAL_MACHINE_ID;
 
   return (
     <div className="flex-1 overflow-y-auto px-2 py-3">
       <ul className="space-y-2">
-        {sortedServers.map((server) => {
-          const isSelected = server.id === selectedServerId;
+        {/* Pinned local machine entry — no context menu, no favorite */}
+        <li key={LOCAL_MACHINE_ID}>
+          <div
+            className={[
+              "flex items-start gap-2 rounded-xl border p-3 transition",
+              isLocalSelected
+                ? "border-[hsl(var(--ring))] bg-[hsl(var(--accent))]"
+                : "border-transparent hover:border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))]",
+            ].join(" ")}
+          >
+            <button
+              type="button"
+              onClick={() => onSelect(LOCAL_MACHINE_ID)}
+              onDoubleClick={() => {
+                onSelect(LOCAL_MACHINE_ID);
+                void onLaunch(LOCAL_MACHINE_SERVER);
+              }}
+              className="min-w-0 flex-1 text-left"
+            >
+              <div className="flex items-center gap-2">
+                <MonitorIcon />
+                <span className="truncate font-medium text-[hsl(var(--foreground))]">
+                  {LOCAL_MACHINE_SERVER.name}
+                </span>
+              </div>
+              <p className="mt-1 truncate text-sm text-[hsl(var(--muted-foreground))]">
+                Local shell
+              </p>
+            </button>
+          </div>
+        </li>
+
+        {sortedServers.length === 0 ? (
+          <li>
+            <div className="px-2 py-4 text-sm text-[hsl(var(--muted-foreground))]">
+              {searchTerm
+                ? `No servers matched "${searchTerm}".`
+                : "No servers yet. Add your first server to get started."}
+            </div>
+          </li>
+        ) : (
+          sortedServers.map((server) => {
+            const isSelected = server.id === selectedServerId;
 
           return (
             <li key={server.id}>
@@ -142,7 +176,8 @@ export function ServerList({
               </div>
             </li>
           );
-        })}
+          })
+        )}
       </ul>
 
       <ContextMenu
@@ -188,6 +223,24 @@ export function ServerList({
         }
       />
     </div>
+  );
+}
+
+function MonitorIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      className="h-4 w-4 shrink-0 text-green-400"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.6"
+    >
+      <rect x="2" y="3" width="16" height="11" rx="1.5" />
+      <path d="M7 17h6M10 14v3" />
+    </svg>
   );
 }
 
