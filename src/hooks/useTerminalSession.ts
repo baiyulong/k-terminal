@@ -26,6 +26,8 @@ export function useTerminalActions() {
 
   const connect = useCallback(
     async (serverId: string, serverName: string) => {
+      // Fetch current store state at invocation time (not closure time) to ensure
+      // proxy settings are fresh. getState() is intentional to keep the callback stable.
       const server = useServerStore.getState().servers.find((s) => s.id === serverId);
       const settings = useSettingsStore.getState();
 
