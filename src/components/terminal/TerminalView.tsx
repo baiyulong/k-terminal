@@ -101,6 +101,23 @@ export function TerminalView({ sessionId, isActive }: TerminalViewProps) {
     return () => cancelAnimationFrame(raf);
   }, [isActive, sessionId, resize]);
 
+  // Sync PTY size the moment the SSH session transitions to "connected".
+  // This is the authoritative resize — it fires AFTER the Rust session is
+  // registered in the manager, so send_resize will actually succeed.
+  // All earlier resize attempts (ResizeObserver, isActive) race against the
+  // TCP/auth handshake and are silently dropped on the Rust side.
+  useEffect(() => {
+    if (session?.status !== "connected") return;
+    const raf = requestAnimationFrame(() => {
+      const fitAddon = fitAddonRef.current;
+      const terminal = terminalRef.current;
+      if (!fitAddon || !terminal) return;
+      fitAddon.fit();
+      resize(sessionId, terminal.cols, terminal.rows);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [session?.status, sessionId, resize]);
+
   // Resize observer → PTY resize
   useEffect(() => {
     const container = containerRef.current;
