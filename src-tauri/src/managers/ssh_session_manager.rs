@@ -244,7 +244,7 @@ async fn run_session(
         .await;
 
     // Notify frontend that we are connected
-    let _ = app.emit(
+    let emit_result = app.emit(
         "terminal:status",
         TerminalStatusEvent {
             session_id: session_id.clone(),
@@ -252,20 +252,36 @@ async fn run_session(
             reason: None,
         },
     );
+    eprintln!("[ssh] Emitted 'connected', result ok={}", emit_result.is_ok());
 
     // 5. Bidirectional pump loop
+    eprintln!("[ssh] Pump loop starting");
     loop {
         tokio::select! {
             msg = channel.wait() => {
                 match msg {
                     Some(ChannelMsg::Data { ref data }) => {
+                        eprintln!("[ssh] Data from server: {} bytes", data.len());
+                        let emit_ok = app.emit("terminal:data", TerminalDataEvent {
+                            session_id: session_id.clone(),
+                            data: data.to_vec(),
+                        }).is_ok();
+                        eprintln!("[ssh] terminal:data emit ok={}", emit_ok);
+                    }
+                    Some(ChannelMsg::ExtendedData { ref data, .. }) => {
+                        // SSH extended data (e.g. stderr) — write to terminal too
                         let _ = app.emit("terminal:data", TerminalDataEvent {
                             session_id: session_id.clone(),
                             data: data.to_vec(),
                         });
                     }
-                    Some(ChannelMsg::ExitStatus { .. }) | None => break,
-                    _ => {}
+                    Some(ChannelMsg::ExitStatus { .. }) | None => {
+                        eprintln!("[ssh] Channel closed (ExitStatus/None)");
+                        break;
+                    }
+                    Some(other) => {
+                        eprintln!("[ssh] Ignored channel msg: {:?}", other);
+                    }
                 }
             }
             Some(data) = input_rx.recv() => {
