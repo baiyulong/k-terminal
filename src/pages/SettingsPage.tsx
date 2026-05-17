@@ -42,7 +42,6 @@ export function SettingsPage({
   const localShell = useSettingsStore((state) => state.localShell);
   const setLocalShell = useSettingsStore((state) => state.setLocalShell);
   const [systemFonts, setSystemFonts] = useState<string[]>([...TERMINAL_FONT_FAMILIES]);
-  const shellSelectRef = useRef<HTMLSelectElement>(null);
 
   const isWindows = typeof navigator !== "undefined" &&
     navigator.userAgent.toLowerCase().includes("windows");
@@ -71,26 +70,7 @@ export function SettingsPage({
     !shellPresets.some((p) => p.value === localShell && p.value !== "__custom__");
   const dropdownValue = isCustomShell ? "__custom__" : localShell;
 
-  console.log("[k-terminal] SettingsPage render: isWindows=", isWindows, "localShell=", JSON.stringify(localShell), "dropdownValue=", JSON.stringify(dropdownValue));
-
-  // Native DOM event listener - bypasses React's synthetic event system for <select>
-  // (WebView2 has a known issue where <select> change events don't bubble through React delegation)
-  useEffect(() => {
-    const el = shellSelectRef.current;
-    if (!el) return;
-    const handler = () => {
-      const value = el.value;
-      console.log("[k-terminal] Native select change event: value=", JSON.stringify(value));
-      if (value === "__custom__") {
-        if (el.dataset.wasCustom !== "true") setLocalShell("");
-      } else {
-        setLocalShell(value);
-      }
-      el.dataset.wasCustom = value === "__custom__" ? "true" : "false";
-    };
-    el.addEventListener("change", handler);
-    return () => el.removeEventListener("change", handler);
-  }, [setLocalShell]);
+  console.log("[k-terminal] SettingsPage render: isWindows=", isWindows, "localShell=", JSON.stringify(localShell));
 
   // Load system fonts from Rust (fc-list / PowerShell) with JS Font Access API fallback
   useEffect(() => {
@@ -333,7 +313,7 @@ export function SettingsPage({
           </div>
 
           {/* Local Shell */}
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-sm font-medium text-[hsl(var(--foreground))]">
                 Local Shell
@@ -343,52 +323,46 @@ export function SettingsPage({
               </p>
             </div>
             <div className="flex flex-col items-end gap-1.5">
-              <div className="flex gap-2">
-                <select
-                  id="shell-select"
-                  ref={shellSelectRef}
-                  className={inputClassName + " w-56"}
-                  value={dropdownValue}
-                  onChange={(e) => {
-                    console.log("[k-terminal] Shell select onChange:", JSON.stringify(e.target.value));
-                    if (e.target.value === "__custom__") {
-                      if (!isCustomShell) setLocalShell("");
-                    } else {
-                      setLocalShell(e.target.value);
-                    }
-                    console.log("[k-terminal] localStorage after set:", window.localStorage.getItem("kterminal.local.shell"));
-                  }}
-                >
-                  {shellPresets.map((p) => (
-                    <option key={p.value} value={p.value}>
-                      {p.label}
-                    </option>
-                  ))}
-                </select>
+              <div className="flex flex-col gap-1 w-56">
+                {shellPresets.filter((p) => p.value !== "__custom__").map((p) => (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => {
+                      console.log("[k-terminal] Shell button clicked:", JSON.stringify(p.value));
+                      setLocalShell(p.value);
+                    }}
+                    className={[
+                      "w-full rounded-xl px-3 py-1.5 text-left text-sm transition",
+                      localShell === p.value
+                        ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-medium"
+                        : "border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))]",
+                    ].join(" ")}
+                  >
+                    {p.label}
+                  </button>
+                ))}
                 <button
                   type="button"
-                  className={buttonClassName}
                   onClick={() => {
-                    const selectEl = document.getElementById('shell-select') as HTMLSelectElement;
-                    const nativeValue = selectEl?.value ?? "";
-                    console.log("[k-terminal] Save button: native select value=", JSON.stringify(nativeValue), "react dropdownValue=", JSON.stringify(dropdownValue));
-                    if (nativeValue !== "__custom__") {
-                      setLocalShell(nativeValue);
-                    }
-                    console.log("[k-terminal] localStorage after save:", window.localStorage.getItem("kterminal.local.shell"));
+                    console.log("[k-terminal] Shell custom button clicked");
+                    if (!isCustomShell) setLocalShell("");
                   }}
+                  className={[
+                    "w-full rounded-xl px-3 py-1.5 text-left text-sm transition",
+                    isCustomShell
+                      ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-medium"
+                      : "border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))]",
+                  ].join(" ")}
                 >
-                  Save
+                  Custom…
                 </button>
               </div>
-              <p className="text-xs text-[hsl(var(--muted-foreground))]">
-                Current: <code>{localShell || "(auto-detect)"}</code>
-              </p>
-              {(dropdownValue === "__custom__" || isCustomShell) && (
+              {isCustomShell && (
                 <input
                   type="text"
                   className={inputClassName + " w-56"}
-                  placeholder="/usr/bin/zsh or C:\path\to\shell.exe"
+                  placeholder="C:\path\to\shell.exe or /usr/bin/zsh"
                   value={localShell}
                   onChange={(e) => setLocalShell(e.target.value)}
                 />
