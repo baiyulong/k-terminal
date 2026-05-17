@@ -25,7 +25,8 @@ pub async fn connect_ssh_session(
         "password" => {
             let raw = server.password.as_deref().unwrap_or("");
             let password = if raw.starts_with("keyring://") {
-                CredentialStore::get_password(&server_id).unwrap_or_default()
+                CredentialStore::get_password(&server_id)
+                    .map_err(|e| format!("Failed to retrieve password from keyring: {}", e))?
             } else {
                 raw.to_string()
             };
@@ -73,8 +74,12 @@ pub async fn disconnect_ssh_session(
     ssh_manager: State<'_, SshSessionManager>,
     session_id: String,
 ) -> Result<(), String> {
-    ssh_manager.remove(&session_id).await;
-    Ok(())
+    let removed = ssh_manager.remove(&session_id).await;
+    if removed {
+        Ok(())
+    } else {
+        Err(format!("Session '{}' not found", session_id))
+    }
 }
 
 #[tauri::command]
@@ -83,8 +88,12 @@ pub async fn terminal_input(
     session_id: String,
     data: Vec<u8>,
 ) -> Result<(), String> {
-    ssh_manager.send_input(&session_id, data).await;
-    Ok(())
+    let sent = ssh_manager.send_input(&session_id, data).await;
+    if sent {
+        Ok(())
+    } else {
+        Err(format!("Failed to send input to session '{}'", session_id))
+    }
 }
 
 #[tauri::command]
@@ -94,6 +103,10 @@ pub async fn terminal_resize(
     cols: u16,
     rows: u16,
 ) -> Result<(), String> {
-    ssh_manager.send_resize(&session_id, cols, rows).await;
-    Ok(())
+    let resized = ssh_manager.send_resize(&session_id, cols, rows).await;
+    if resized {
+        Ok(())
+    } else {
+        Err(format!("Failed to resize session '{}'", session_id))
+    }
 }
