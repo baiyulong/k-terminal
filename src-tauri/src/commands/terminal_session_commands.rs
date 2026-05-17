@@ -1,19 +1,20 @@
-use tauri::{AppHandle, State};
+use tauri::State;
+use tauri::ipc::Channel;
 use uuid::Uuid;
 
 use crate::db::DbPool;
 use crate::managers::server_manager::ServerManager;
 use crate::managers::ssh_session_manager::{
-    establish_session, SshAuthMethod, SshConnectConfig, SshSessionManager,
+    establish_session, SshAuthMethod, SshConnectConfig, SshSessionManager, TerminalChannelMessage,
 };
 use crate::security::keyring::CredentialStore;
 
 #[tauri::command]
 pub async fn connect_ssh_session(
-    app: AppHandle,
     pool: State<'_, DbPool>,
     ssh_manager: State<'_, SshSessionManager>,
     server_id: String,
+    channel: Channel<TerminalChannelMessage>,
     cols: Option<u16>,
     rows: Option<u16>,
 ) -> Result<String, String> {
@@ -57,13 +58,13 @@ pub async fn connect_ssh_session(
         auth,
         initial_cols: cols.unwrap_or(220),
         initial_rows: rows.unwrap_or(50),
+        channel,
     };
 
     let manager_clone = ssh_manager.inner().clone();
-    let app_clone = app.clone();
 
     tokio::spawn(async move {
-        establish_session(app_clone, manager_clone, config).await;
+        establish_session(manager_clone, config).await;
     });
 
     Ok(session_id)

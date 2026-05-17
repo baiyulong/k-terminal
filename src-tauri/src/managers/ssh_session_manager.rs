@@ -5,10 +5,10 @@ use russh::client::{self, Config, Handle};
 use russh::keys::{load_secret_key, PrivateKeyWithHashAlg};
 use russh::ChannelMsg;
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use tauri::ipc::Channel;
 use tokio::sync::{mpsc, oneshot, Mutex};
 
-// ── Public event types (emitted to frontend via Tauri) ──────────────────────
+// ── Public event types (sent to frontend via Tauri Channel) ─────────────────
 
 #[derive(Debug, Clone, Serialize)]
 pub struct TerminalDataEvent {
@@ -22,6 +22,13 @@ pub struct TerminalStatusEvent {
     /// "connecting" | "connected" | "disconnected" | "error"
     pub status: String,
     pub reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "type", content = "payload")]
+pub enum TerminalChannelMessage {
+    Data(TerminalDataEvent),
+    Status(TerminalStatusEvent),
 }
 
 // ── Session handle (stored in manager) ──────────────────────────────────────
@@ -93,7 +100,7 @@ impl Default for SshSessionManager {
 
 // ── Config for establishing a session (passed to spawn task) ────────────────
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SshConnectConfig {
     pub session_id: String,
     pub server_id: String,
@@ -103,6 +110,7 @@ pub struct SshConnectConfig {
     pub auth: SshAuthMethod,
     pub initial_cols: u16,
     pub initial_rows: u16,
+    pub channel: Channel<TerminalChannelMessage>,
 }
 
 #[derive(Debug, Clone)]
@@ -132,42 +140,35 @@ impl client::Handler for SshClientHandler {
 /// Spawns an async task that connects via russh, authenticates, opens a PTY
 /// channel, and pumps data bidirectionally until the session ends.
 pub async fn establish_session(
-    app: AppHandle,
     manager: SshSessionManager,
     config: SshConnectConfig,
 ) {
     let session_id = config.session_id.clone();
-    let app_emit = app.clone();
+    let channel = config.channel.clone();
 
-    // Emit "connecting" immediately so frontend shows yellow dot
-    let _ = app.emit(
-        "terminal:status",
-        TerminalStatusEvent {
+    // Send "connecting" immediately so frontend shows yellow dot
+    channel.send(TerminalChannelMessage::Status(TerminalStatusEvent {
+        session_id: session_id.clone(),
+        status: "connecting".to_string(),
+        reason: None,
+    })).ok();
+
+    if let Err(err) = run_session(manager.clone(), config).await {
+        channel.send(TerminalChannelMessage::Status(TerminalStatusEvent {
             session_id: session_id.clone(),
-            status: "connecting".to_string(),
-            reason: None,
-        },
-    );
-
-    if let Err(err) = run_session(app, manager.clone(), config).await {
-        let _ = app_emit.emit(
-            "terminal:status",
-            TerminalStatusEvent {
-                session_id: session_id.clone(),
-                status: "error".to_string(),
-                reason: Some(err.to_string()),
-            },
-        );
+            status: "error".to_string(),
+            reason: Some(err.to_string()),
+        })).ok();
         manager.remove(&session_id).await;
     }
 }
 
 async fn run_session(
-    app: AppHandle,
     manager: SshSessionManager,
     config: SshConnectConfig,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let session_id = config.session_id.clone();
+    let channel = config.channel.clone();
 
     // 1. TCP connect + SSH handshake
     let russh_config = Arc::new(Config::default());
@@ -206,12 +207,12 @@ async fn run_session(
     }
     eprintln!("[ssh] Authenticated OK");
 
-    // 3. Open session channel, request PTY and shell
-    eprintln!("[ssh] Opening channel");
-    let mut channel = ssh_handle.channel_open_session().await
+    // 3. Open session ssh_channel, request PTY and shell
+    eprintln!("[ssh] Opening ssh_channel");
+    let mut ssh_channel = ssh_handle.channel_open_session().await
         .map_err(|e| { eprintln!("[ssh] channel_open_session error: {}", e); e })?;
     eprintln!("[ssh] Requesting PTY");
-    channel
+    ssh_channel
         .request_pty(
             true,
             "xterm-256color",
@@ -224,7 +225,7 @@ async fn run_session(
         .await
         .map_err(|e| { eprintln!("[ssh] request_pty error: {}", e); e })?;
     eprintln!("[ssh] Requesting shell");
-    channel.request_shell(true).await
+    ssh_channel.request_shell(true).await
         .map_err(|e| { eprintln!("[ssh] request_shell error: {}", e); e })?;
     eprintln!("[ssh] Shell started");
 
@@ -244,67 +245,61 @@ async fn run_session(
         .await;
 
     // Notify frontend that we are connected
-    let emit_result = app.emit(
-        "terminal:status",
-        TerminalStatusEvent {
-            session_id: session_id.clone(),
-            status: "connected".to_string(),
-            reason: None,
-        },
-    );
-    eprintln!("[ssh] Emitted 'connected', result ok={}", emit_result.is_ok());
+    let send_result = channel.send(TerminalChannelMessage::Status(TerminalStatusEvent {
+        session_id: session_id.clone(),
+        status: "connected".to_string(),
+        reason: None,
+    }));
+    eprintln!("[ssh] Sent 'connected', result ok={}", send_result.is_ok());
 
     // 5. Bidirectional pump loop
     eprintln!("[ssh] Pump loop starting");
     loop {
         tokio::select! {
-            msg = channel.wait() => {
+            msg = ssh_channel.wait() => {
                 match msg {
                     Some(ChannelMsg::Data { ref data }) => {
                         eprintln!("[ssh] Data from server: {} bytes", data.len());
-                        let emit_ok = app.emit("terminal:data", TerminalDataEvent {
+                        let send_ok = channel.send(TerminalChannelMessage::Data(TerminalDataEvent {
                             session_id: session_id.clone(),
                             data: data.to_vec(),
-                        }).is_ok();
-                        eprintln!("[ssh] terminal:data emit ok={}", emit_ok);
+                        })).is_ok();
+                        eprintln!("[ssh] terminal:data send ok={}", send_ok);
                     }
                     Some(ChannelMsg::ExtendedData { ref data, .. }) => {
                         // SSH extended data (e.g. stderr) — write to terminal too
-                        let _ = app.emit("terminal:data", TerminalDataEvent {
+                        channel.send(TerminalChannelMessage::Data(TerminalDataEvent {
                             session_id: session_id.clone(),
                             data: data.to_vec(),
-                        });
+                        })).ok();
                     }
                     Some(ChannelMsg::ExitStatus { .. }) | None => {
-                        eprintln!("[ssh] Channel closed (ExitStatus/None)");
+                        eprintln!("[ssh] ssh_channel closed (ExitStatus/None)");
                         break;
                     }
                     Some(other) => {
-                        eprintln!("[ssh] Ignored channel msg: {:?}", other);
+                        eprintln!("[ssh] Ignored ssh_channel msg: {:?}", other);
                     }
                 }
             }
             Some(data) = input_rx.recv() => {
-                if channel.data(data.as_slice()).await.is_err() {
+                if ssh_channel.data(data.as_slice()).await.is_err() {
                     break;
                 }
             }
             Some((cols, rows)) = resize_rx.recv() => {
-                let _ = channel.window_change(cols as u32, rows as u32, 0, 0).await;
+                let _ = ssh_channel.window_change(cols as u32, rows as u32, 0, 0).await;
             }
             _ = &mut abort_rx => break,
         }
     }
 
     manager.remove(&session_id).await;
-    let _ = app.emit(
-        "terminal:status",
-        TerminalStatusEvent {
-            session_id,
-            status: "disconnected".to_string(),
-            reason: None,
-        },
-    );
+    channel.send(TerminalChannelMessage::Status(TerminalStatusEvent {
+        session_id,
+        status: "disconnected".to_string(),
+        reason: None,
+    })).ok();
 
     Ok(())
 }

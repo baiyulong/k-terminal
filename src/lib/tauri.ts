@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { Channel } from "@tauri-apps/api/core";
 import type {
   AppInfo,
   CreateGroupRequest,
@@ -16,6 +17,10 @@ import type {
   UpdateServerRequest,
   UpdateTerminalProfileRequest,
 } from "./types";
+
+export type TerminalChannelMessage =
+  | { type: "Data"; payload: { session_id: string; data: number[] } }
+  | { type: "Status"; payload: { session_id: string; status: string; reason?: string } };
 
 export const serverApi = {
   list: () => invoke<Server[]>("list_servers"),
@@ -80,10 +85,11 @@ export const settingsApi = {
 export const terminalSessionApi = {
   connect: (
     serverId: string,
+    channel: Channel<TerminalChannelMessage>,
     cols?: number,
     rows?: number,
   ): Promise<string> =>
-    invoke("connect_ssh_session", { serverId, cols, rows }),
+    invoke("connect_ssh_session", { serverId, channel, cols, rows }),
 
   disconnect: (sessionId: string): Promise<void> =>
     invoke("disconnect_ssh_session", { sessionId }),

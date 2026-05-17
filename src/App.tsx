@@ -6,7 +6,6 @@ import { SettingsPage } from "@/pages/SettingsPage";
 import { TerminalPage } from "@/components/terminal/TerminalPage";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useTerminalSessionStore } from "@/stores/terminalSessionStore";
-import { useTerminalStatusListener } from "@/hooks/useTerminalSession";
 
 type AppPage = "home" | "settings" | "terminal";
 
@@ -27,10 +26,6 @@ const isEditableTarget = (target: EventTarget | null) => {
 function App() {
   const theme = useSettingsStore((state) => state.theme);
   const [page, setPage] = useState<AppPage>("home");
-
-  // Register global SSH status listener at app root so events are never missed
-  // regardless of which page is currently mounted.
-  useTerminalStatusListener();
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [newServerShortcutSignal, setNewServerShortcutSignal] = useState(0);
   const [connectShortcutSignal, setConnectShortcutSignal] = useState(0);

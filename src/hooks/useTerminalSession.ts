@@ -1,78 +1,17 @@
-import { useCallback, useEffect } from "react";
-import { listen } from "@tauri-apps/api/event";
+import { useCallback } from "react";
 import { terminalSessionApi } from "@/lib/tauri";
 import {
+  createChannel,
+  storeChannel,
+  releaseChannel,
+  registerDataHandler,
+  unregisterDataHandler,
+} from "@/lib/terminalChannels";
+import {
   useTerminalSessionStore,
-  type SessionStatus,
 } from "@/stores/terminalSessionStore";
 
-interface TerminalDataPayload {
-  session_id: string;
-  data: number[];
-}
-
-interface TerminalStatusPayload {
-  session_id: string;
-  status: SessionStatus;
-  reason?: string;
-}
-
-/**
- * Subscribe to terminal:data events for a single session.
- * Returns a cleanup function.
- */
-export function useTerminalDataListener(
-  sessionId: string | null,
-  onData: (data: Uint8Array) => void,
-) {
-  useEffect(() => {
-    if (!sessionId) return;
-
-    let unlisten: (() => void) | undefined;
-    let cancelled = false;
-
-    listen<TerminalDataPayload>("terminal:data", (event) => {
-      if (event.payload.session_id === sessionId) {
-        onData(new Uint8Array(event.payload.data));
-      }
-    }).then((fn) => {
-      if (cancelled) fn(); else unlisten = fn;
-    });
-
-    return () => {
-      cancelled = true;
-      unlisten?.();
-    };
-  }, [sessionId, onData]);
-}
-
-/**
- * Global status listener — updates the store for ALL sessions.
- * Mount once at the app root (TerminalPage).
- */
-export function useTerminalStatusListener() {
-  const updateSessionStatus = useTerminalSessionStore(
-    (state) => state.updateSessionStatus,
-  );
-
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    let cancelled = false;
-
-    listen<TerminalStatusPayload>("terminal:status", (event) => {
-      const { session_id, status, reason } = event.payload;
-      console.log("[terminal:status]", { session_id, status, reason });
-      updateSessionStatus(session_id, status, reason);
-    }).then((fn) => {
-      if (cancelled) fn(); else unlisten = fn;
-    });
-
-    return () => {
-      cancelled = true;
-      unlisten?.();
-    };
-  }, [updateSessionStatus]);
-}
+export { registerDataHandler, unregisterDataHandler };
 
 /**
  * Returns helpers for connecting to / disconnecting from a server.
@@ -80,10 +19,15 @@ export function useTerminalStatusListener() {
 export function useTerminalActions() {
   const addSession = useTerminalSessionStore((state) => state.addSession);
   const removeSession = useTerminalSessionStore((state) => state.removeSession);
+  const updateSessionStatus = useTerminalSessionStore((state) => state.updateSessionStatus);
 
   const connect = useCallback(
     async (serverId: string, serverName: string) => {
-      const sessionId = await terminalSessionApi.connect(serverId);
+      const channel = createChannel((sessionId, status, reason) => {
+        updateSessionStatus(sessionId, status, reason);
+      });
+      const sessionId = await terminalSessionApi.connect(serverId, channel);
+      storeChannel(sessionId, channel);
       addSession({
         id: sessionId,
         serverId,
@@ -92,7 +36,7 @@ export function useTerminalActions() {
       });
       return sessionId;
     },
-    [addSession],
+    [addSession, updateSessionStatus],
   );
 
   const disconnect = useCallback(
@@ -102,6 +46,7 @@ export function useTerminalActions() {
       } catch {
         // Session may have already been removed from backend (e.g. server closed connection)
       }
+      releaseChannel(sessionId);
       removeSession(sessionId);
     },
     [removeSession],

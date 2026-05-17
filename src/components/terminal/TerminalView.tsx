@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
-import { useTerminalDataListener, useTerminalActions } from "@/hooks/useTerminalSession";
+import { useTerminalActions } from "@/hooks/useTerminalSession";
+import { registerDataHandler, unregisterDataHandler } from "@/lib/terminalChannels";
 import { useTerminalSessionStore } from "@/stores/terminalSessionStore";
 
 interface TerminalViewProps {
@@ -115,7 +116,10 @@ export function TerminalView({ sessionId, isActive }: TerminalViewProps) {
     terminalRef.current?.write(data);
   }, []);
 
-  useTerminalDataListener(sessionId, handleData);
+  useEffect(() => {
+    registerDataHandler(sessionId, handleData);
+    return () => unregisterDataHandler(sessionId);
+  }, [sessionId, handleData]);
 
   return (
     <div
