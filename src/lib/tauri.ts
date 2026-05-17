@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Channel } from "@tauri-apps/api/core";
+import type { ProxyConfig } from "./proxyResolver";
 import type {
   AppInfo,
   CreateGroupRequest,
@@ -87,10 +88,11 @@ export const terminalSessionApi = {
   connect: (
     serverId: string,
     channel: Channel<TerminalChannelMessage>,
+    proxy?: ProxyConfig | null,
     cols?: number,
     rows?: number,
   ): Promise<string> =>
-    invoke("connect_ssh_session", { serverId, channel, cols, rows }),
+    invoke("connect_ssh_session", { serverId, channel, proxy: proxy ?? null, cols, rows }),
 
   disconnect: (sessionId: string): Promise<void> =>
     invoke("disconnect_ssh_session", { sessionId }),

@@ -1,5 +1,8 @@
 import { useCallback } from "react";
 import { terminalSessionApi } from "@/lib/tauri";
+import { resolveProxy } from "@/lib/proxyResolver";
+import { useSettingsStore } from "@/stores/settingsStore";
+import { useServerStore } from "@/stores/serverStore";
 import {
   createChannel,
   storeChannel,
@@ -23,10 +26,26 @@ export function useTerminalActions() {
 
   const connect = useCallback(
     async (serverId: string, serverName: string) => {
+      const server = useServerStore.getState().servers.find((s) => s.id === serverId);
+      const settings = useSettingsStore.getState();
+
+      const proxy = resolveProxy(
+        server?.proxy_type ?? "global",
+        server?.proxy_host,
+        server?.proxy_port,
+        {
+          proxyType: settings.proxyType,
+          proxyHost: settings.proxyHost,
+          proxyPort: settings.proxyPort,
+          proxyBypass: settings.proxyBypass,
+        },
+        server?.host ?? "",
+      );
+
       const channel = createChannel((sessionId, status, reason) => {
         updateSessionStatus(sessionId, status, reason);
       });
-      const sessionId = await terminalSessionApi.connect(serverId, channel);
+      const sessionId = await terminalSessionApi.connect(serverId, channel, proxy);
       storeChannel(sessionId, channel);
       addSession({
         id: sessionId,
