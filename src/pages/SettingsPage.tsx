@@ -39,7 +39,36 @@ export function SettingsPage({
   const setProxyPort = useSettingsStore((state) => state.setProxyPort);
   const proxyBypass = useSettingsStore((state) => state.proxyBypass);
   const setProxyBypass = useSettingsStore((state) => state.setProxyBypass);
+  const localShell = useSettingsStore((state) => state.localShell);
+  const setLocalShell = useSettingsStore((state) => state.setLocalShell);
   const [systemFonts, setSystemFonts] = useState<string[]>([...TERMINAL_FONT_FAMILIES]);
+
+  const isWindows = typeof navigator !== "undefined" &&
+    navigator.userAgent.toLowerCase().includes("windows");
+
+  const shellPresets = isWindows
+    ? [
+        { label: "Auto-detect", value: "" },
+        { label: "PowerShell (pwsh)", value: "pwsh" },
+        { label: "Windows PowerShell", value: "powershell" },
+        { label: "Command Prompt (cmd.exe)", value: "cmd.exe" },
+        { label: "Git Bash", value: "C:\\Program Files\\Git\\bin\\bash.exe" },
+        { label: "WSL (bash)", value: "wsl.exe" },
+        { label: "Custom...", value: "__custom__" },
+      ]
+    : [
+        { label: "Auto-detect", value: "" },
+        { label: "Zsh (/bin/zsh)", value: "/bin/zsh" },
+        { label: "Bash (/bin/bash)", value: "/bin/bash" },
+        { label: "Fish (/usr/bin/fish)", value: "/usr/bin/fish" },
+        { label: "Sh (/bin/sh)", value: "/bin/sh" },
+        { label: "Custom...", value: "__custom__" },
+      ];
+
+  const isCustomShell =
+    localShell !== "" &&
+    !shellPresets.some((p) => p.value === localShell && p.value !== "__custom__");
+  const dropdownValue = isCustomShell ? "__custom__" : localShell;
 
   // Load system fonts from Rust (fc-list / PowerShell) with JS Font Access API fallback
   useEffect(() => {
@@ -278,6 +307,46 @@ export function SettingsPage({
               >
                 +
               </button>
+            </div>
+          </div>
+
+          {/* Local Shell */}
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-[hsl(var(--foreground))]">
+                Local Shell
+              </p>
+              <p className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">
+                Shell launched for Local Machine sessions
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-1.5">
+              <select
+                className={inputClassName + " w-56"}
+                value={dropdownValue}
+                onChange={(e) => {
+                  if (e.target.value === "__custom__") {
+                    if (!isCustomShell) setLocalShell("");
+                  } else {
+                    setLocalShell(e.target.value);
+                  }
+                }}
+              >
+                {shellPresets.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+              {(dropdownValue === "__custom__" || isCustomShell) && (
+                <input
+                  type="text"
+                  className={inputClassName + " w-56"}
+                  placeholder="/usr/bin/zsh or C:\path\to\shell.exe"
+                  value={localShell}
+                  onChange={(e) => setLocalShell(e.target.value)}
+                />
+              )}
             </div>
           </div>
         </section>
