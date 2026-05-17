@@ -6,7 +6,10 @@ use russh::keys::{load_secret_key, PrivateKeyWithHashAlg};
 use russh::ChannelMsg;
 use serde::Serialize;
 use tauri::ipc::Channel;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
 use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio_socks::tcp::socks5::Socks5Stream;
 
 // ── Public event types (sent to frontend via Tauri Channel) ─────────────────
 
@@ -111,12 +114,22 @@ pub struct SshConnectConfig {
     pub initial_cols: u16,
     pub initial_rows: u16,
     pub channel: Channel<TerminalChannelMessage>,
+    pub proxy: Option<ProxyConfig>,
 }
 
 #[derive(Debug, Clone)]
 pub enum SshAuthMethod {
     Password(String),
     PrivateKey { path: String, passphrase: Option<String> },
+}
+
+/// Proxy configuration resolved by the frontend before connecting.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct ProxyConfig {
+    /// "http" | "socks5"
+    pub proxy_type: String,
+    pub host: String,
+    pub port: u16,
 }
 
 // ── russh client handler ─────────────────────────────────────────────────────
@@ -163,6 +176,63 @@ pub async fn establish_session(
     }
 }
 
+/// Opens a TCP stream to `target_host:target_port`, tunnelling through `proxy` if provided.
+async fn build_proxied_stream(
+    target_host: &str,
+    target_port: u16,
+    proxy: Option<&ProxyConfig>,
+) -> Result<TcpStream, Box<dyn std::error::Error + Send + Sync>> {
+    match proxy {
+        None => {
+            let stream = TcpStream::connect((target_host, target_port)).await?;
+            Ok(stream)
+        }
+        Some(p) if p.proxy_type == "socks5" => {
+            eprintln!("[proxy] SOCKS5 via {}:{}", p.host, p.port);
+            let socks = Socks5Stream::connect(
+                (p.host.as_str(), p.port),
+                (target_host, target_port),
+            )
+            .await
+            .map_err(|e| format!("SOCKS5 proxy error: {}", e))?;
+            Ok(socks.into_inner())
+        }
+        Some(p) => {
+            // HTTP CONNECT
+            eprintln!("[proxy] HTTP CONNECT via {}:{}", p.host, p.port);
+            let mut stream = TcpStream::connect((p.host.as_str(), p.port)).await?;
+            let req = format!(
+                "CONNECT {host}:{port} HTTP/1.1\r\nHost: {host}:{port}\r\n\r\n",
+                host = target_host,
+                port = target_port,
+            );
+            stream.write_all(req.as_bytes()).await?;
+
+            // Read response headers byte-by-byte until \r\n\r\n
+            let mut resp = Vec::with_capacity(256);
+            let mut buf = [0u8; 1];
+            loop {
+                stream.read_exact(&mut buf).await?;
+                resp.push(buf[0]);
+                if resp.ends_with(b"\r\n\r\n") {
+                    break;
+                }
+                if resp.len() > 4096 {
+                    return Err("HTTP proxy response too large".into());
+                }
+            }
+
+            let resp_str = String::from_utf8_lossy(&resp);
+            let status_line = resp_str.lines().next().unwrap_or("");
+            if !status_line.contains(" 200") {
+                return Err(format!("HTTP proxy rejected: {}", status_line.trim()).into());
+            }
+            eprintln!("[proxy] HTTP CONNECT OK");
+            Ok(stream)
+        }
+    }
+}
+
 async fn run_session(
     manager: SshSessionManager,
     config: SshConnectConfig,
@@ -174,10 +244,13 @@ async fn run_session(
     let russh_config = Arc::new(Config::default());
     let addr = format!("{}:{}", config.host, config.port);
     eprintln!("[ssh] Connecting to {}", addr);
-    let mut ssh_handle: Handle<SshClientHandler> =
-        client::connect(russh_config, addr.as_str(), SshClientHandler).await
-        .map_err(|e| { eprintln!("[ssh] TCP/handshake failed: {}", e); e })?;
+    let stream = build_proxied_stream(&config.host, config.port, config.proxy.as_ref())
+        .await
+        .map_err(|e| { eprintln!("[ssh] TCP connect failed: {}", e); e })?;
     eprintln!("[ssh] TCP+handshake OK");
+    let mut ssh_handle: Handle<SshClientHandler> =
+        client::connect_stream(russh_config, stream, SshClientHandler).await
+        .map_err(|e| { eprintln!("[ssh] SSH handshake failed: {}", e); e })?;
 
     // 2. Authenticate
     eprintln!("[ssh] Authenticating as '{}'", config.username);

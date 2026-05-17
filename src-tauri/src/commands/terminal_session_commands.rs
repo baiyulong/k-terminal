@@ -59,6 +59,7 @@ pub async fn connect_ssh_session(
         initial_cols: cols.unwrap_or(220),
         initial_rows: rows.unwrap_or(50),
         channel,
+        proxy: None,
     };
 
     let manager_clone = ssh_manager.inner().clone();
