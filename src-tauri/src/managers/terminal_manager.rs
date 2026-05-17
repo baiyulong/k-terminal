@@ -510,6 +510,9 @@ mod tests {
                 compression: false,
                 agent_forward: false,
                 port_forwards: None,
+                proxy_type: "global".to_string(),
+                proxy_host: None,
+                proxy_port: None,
             })
             .execute(&mut conn)
             .unwrap();
