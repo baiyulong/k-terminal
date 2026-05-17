@@ -130,6 +130,8 @@ pub struct ProxyConfig {
     pub proxy_type: String,
     pub host: String,
     pub port: u16,
+    /// newline-separated bypass list; used by local PTY for NO_PROXY injection
+    pub bypass: Option<String>,
 }
 
 // ── russh client handler ─────────────────────────────────────────────────────

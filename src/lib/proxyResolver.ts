@@ -3,6 +3,7 @@ export interface ProxyConfig {
   proxy_type: "http" | "socks5";
   host: string;
   port: number;
+  bypass?: string; // newline-separated bypass list; used for NO_PROXY injection in local sessions
 }
 
 export interface GlobalProxySettings {
