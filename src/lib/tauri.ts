@@ -94,8 +94,19 @@ export const terminalSessionApi = {
   ): Promise<string> =>
     invoke("connect_ssh_session", { serverId, channel, proxy: proxy ?? null, cols, rows }),
 
+  connectLocal: (
+    channel: Channel<TerminalChannelMessage>,
+    proxy?: ProxyConfig | null,
+    cols?: number,
+    rows?: number,
+  ): Promise<string> =>
+    invoke("connect_local_session", { channel, proxy: proxy ?? null, cols, rows }),
+
   disconnect: (sessionId: string): Promise<void> =>
     invoke("disconnect_ssh_session", { sessionId }),
+
+  disconnectLocal: (sessionId: string): Promise<void> =>
+    invoke("disconnect_local_session", { sessionId }),
 
   sendInput: (sessionId: string, data: number[]): Promise<void> =>
     invoke("terminal_input", { sessionId, data }),
