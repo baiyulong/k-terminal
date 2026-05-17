@@ -70,6 +70,8 @@ export function SettingsPage({
     !shellPresets.some((p) => p.value === localShell && p.value !== "__custom__");
   const dropdownValue = isCustomShell ? "__custom__" : localShell;
 
+  console.log("[k-terminal] SettingsPage render: isWindows=", isWindows, "localShell=", JSON.stringify(localShell), "dropdownValue=", JSON.stringify(dropdownValue));
+
   // Load system fonts from Rust (fc-list / PowerShell) with JS Font Access API fallback
   useEffect(() => {
     (async () => {
@@ -321,25 +323,46 @@ export function SettingsPage({
               </p>
             </div>
             <div className="flex flex-col items-end gap-1.5">
-              <select
-                className={inputClassName + " w-56"}
-                value={dropdownValue}
-                onChange={(e) => {
-                  console.log("[k-terminal] Shell select onChange:", JSON.stringify(e.target.value));
-                  if (e.target.value === "__custom__") {
-                    if (!isCustomShell) setLocalShell("");
-                  } else {
-                    setLocalShell(e.target.value);
-                  }
-                  console.log("[k-terminal] localStorage after set:", window.localStorage.getItem("kterminal.local.shell"));
-                }}
-              >
-                {shellPresets.map((p) => (
-                  <option key={p.value} value={p.value}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
+              <div className="flex gap-2">
+                <select
+                  id="shell-select"
+                  className={inputClassName + " w-56"}
+                  value={dropdownValue}
+                  onChange={(e) => {
+                    console.log("[k-terminal] Shell select onChange:", JSON.stringify(e.target.value));
+                    if (e.target.value === "__custom__") {
+                      if (!isCustomShell) setLocalShell("");
+                    } else {
+                      setLocalShell(e.target.value);
+                    }
+                    console.log("[k-terminal] localStorage after set:", window.localStorage.getItem("kterminal.local.shell"));
+                  }}
+                >
+                  {shellPresets.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className={buttonClassName}
+                  onClick={() => {
+                    const selectEl = document.getElementById('shell-select') as HTMLSelectElement;
+                    const nativeValue = selectEl?.value ?? "";
+                    console.log("[k-terminal] Save button: native select value=", JSON.stringify(nativeValue), "react dropdownValue=", JSON.stringify(dropdownValue));
+                    if (nativeValue !== "__custom__") {
+                      setLocalShell(nativeValue);
+                    }
+                    console.log("[k-terminal] localStorage after save:", window.localStorage.getItem("kterminal.local.shell"));
+                  }}
+                >
+                  Save
+                </button>
+              </div>
+              <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                Current: <code>{localShell || "(auto-detect)"}</code>
+              </p>
               {(dropdownValue === "__custom__" || isCustomShell) && (
                 <input
                   type="text"
