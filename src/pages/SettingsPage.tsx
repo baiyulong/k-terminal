@@ -68,7 +68,6 @@ export function SettingsPage({
   const isCustomShell =
     localShell !== "" &&
     !shellPresets.some((p) => p.value === localShell && p.value !== "__custom__");
-  const dropdownValue = isCustomShell ? "__custom__" : localShell;
 
   console.log("[k-terminal] SettingsPage render: isWindows=", isWindows, "localShell=", JSON.stringify(localShell));
 
