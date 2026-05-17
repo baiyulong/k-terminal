@@ -3,10 +3,11 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { CommandPalette } from "@/components/search/CommandPalette";
 import { ToastViewport } from "@/components/ui/Toast";
 import { SettingsPage } from "@/pages/SettingsPage";
-import { TerminalProfilesPage } from "@/pages/TerminalProfilesPage";
+import { TerminalPage } from "@/components/terminal/TerminalPage";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { useTerminalSessionStore } from "@/stores/terminalSessionStore";
 
-type AppPage = "home" | "settings" | "terminal-profiles";
+type AppPage = "home" | "settings" | "terminal";
 
 const isEditableTarget = (target: EventTarget | null) => {
   if (!(target instanceof HTMLElement)) {
@@ -28,6 +29,18 @@ function App() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [newServerShortcutSignal, setNewServerShortcutSignal] = useState(0);
   const [connectShortcutSignal, setConnectShortcutSignal] = useState(0);
+
+  const sessions = useTerminalSessionStore((state) => state.sessions);
+
+  // Auto-navigate to terminal page when first session is created
+  useEffect(() => {
+    if (sessions.length > 0 && page === "home") {
+      setPage("terminal");
+    }
+    if (sessions.length === 0 && page === "terminal") {
+      setPage("home");
+    }
+  }, [sessions.length, page]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
@@ -81,19 +94,17 @@ function App() {
       {page === "home" ? (
         <MainLayout
           onOpenSettings={() => setPage("settings")}
+          onNavigateToTerminal={() => setPage("terminal")}
           newServerShortcutSignal={newServerShortcutSignal}
           connectShortcutSignal={connectShortcutSignal}
         />
       ) : page === "settings" ? (
         <SettingsPage
           onNavigateHome={() => setPage("home")}
-          onOpenTerminalProfiles={() => setPage("terminal-profiles")}
+          onOpenTerminalProfiles={() => {}}
         />
       ) : (
-        <TerminalProfilesPage
-          onBack={() => setPage("settings")}
-          onNavigateHome={() => setPage("home")}
-        />
+        <TerminalPage onOpenSettings={() => setPage("settings")} />
       )}
 
       <CommandPalette

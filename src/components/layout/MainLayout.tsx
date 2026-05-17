@@ -16,7 +16,7 @@ import {
   useToggleFavoriteMutation,
   useUpdateServerMutation,
 } from "@/hooks/useServers";
-import { useLaunchTerminalMutation } from "@/hooks/useTerminal";
+import { useTerminalActions } from "@/hooks/useTerminalSession";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { sshApi } from "@/lib/tauri";
 import type {
@@ -30,6 +30,7 @@ import { useServerStore } from "@/stores/serverStore";
 
 interface MainLayoutProps {
   onOpenSettings: () => void;
+  onNavigateToTerminal: () => void;
   newServerShortcutSignal: number;
   connectShortcutSignal: number;
 }
@@ -144,6 +145,7 @@ const toServerPayload = (
 
 export function MainLayout({
   onOpenSettings,
+  onNavigateToTerminal,
   newServerShortcutSignal,
   connectShortcutSignal,
 }: MainLayoutProps) {
@@ -162,7 +164,7 @@ export function MainLayout({
   const cloneServerMutation = useCloneServerMutation();
   const deleteServerMutation = useDeleteServerMutation();
   const toggleFavoriteMutation = useToggleFavoriteMutation();
-  const launchTerminalMutation = useLaunchTerminalMutation();
+  const { connect } = useTerminalActions();
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -230,12 +232,6 @@ export function MainLayout({
           : toggleFavoriteMutation.error
             ? getErrorMessage(toggleFavoriteMutation.error)
             : null;
-  const selectedConnectFeedback =
-    selectedServer &&
-    launchTerminalMutation.feedback?.serverId === selectedServer.id
-      ? launchTerminalMutation.feedback
-      : null;
-
   const closeForm = useCallback(() => {
     setIsFormOpen(false);
     setEditingServer(null);
@@ -303,19 +299,12 @@ export function MainLayout({
   };
 
   const handleConnect = useCallback(
-    (server: Server) => {
+    async (server: Server) => {
       setSelectedServerId(server.id);
-
-      if (
-        launchTerminalMutation.isPending &&
-        launchTerminalMutation.activeServerId === server.id
-      ) {
-        return;
-      }
-
-      void launchTerminalMutation.launch(server.id);
+      await connect(server.id, server.name);
+      onNavigateToTerminal();
     },
-    [launchTerminalMutation, setSelectedServerId],
+    [connect, onNavigateToTerminal, setSelectedServerId],
   );
 
   const handleCloneServer = async (server: Server) => {
@@ -415,18 +404,6 @@ export function MainLayout({
           server={selectedServer}
           isDeleting={deleteServerMutation.isPending}
           isFavoriteUpdating={toggleFavoriteMutation.isPending}
-          isConnecting={
-            launchTerminalMutation.isPending &&
-            launchTerminalMutation.activeServerId === selectedServer?.id
-          }
-          connectFeedback={
-            selectedConnectFeedback
-              ? {
-                  tone: selectedConnectFeedback.tone,
-                  message: selectedConnectFeedback.message,
-                }
-              : null
-          }
           onConnect={handleConnect}
           onEdit={handleEditServer}
           onDelete={handleDeleteServer}

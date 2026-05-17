@@ -8,11 +8,6 @@ interface ServerDetailProps {
   server: Server | null;
   isDeleting?: boolean;
   isFavoriteUpdating?: boolean;
-  isConnecting?: boolean;
-  connectFeedback?: {
-    tone: "success" | "error";
-    message: string;
-  } | null;
   onConnect: (server: Server) => void;
   onEdit: (server: Server) => void;
   onDelete: (server: Server) => void;
@@ -23,8 +18,6 @@ export function ServerDetail({
   server,
   isDeleting = false,
   isFavoriteUpdating = false,
-  isConnecting = false,
-  connectFeedback = null,
   onConnect,
   onEdit,
   onDelete,
@@ -124,11 +117,10 @@ export function ServerDetail({
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
-                disabled={isConnecting}
                 onClick={() => onConnect(server)}
                 className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2 text-sm font-semibold text-[hsl(var(--primary-foreground))] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isConnecting ? "Launching..." : "Connect"}
+                Connect
               </button>
               <button
                 type="button"
@@ -162,19 +154,6 @@ export function ServerDetail({
                 Delete
               </button>
             </div>
-
-            {connectFeedback ? (
-              <p
-                className={[
-                  "text-sm font-medium",
-                  connectFeedback.tone === "success"
-                    ? "text-emerald-500"
-                    : "text-red-500",
-                ].join(" ")}
-              >
-                {connectFeedback.message}
-              </p>
-            ) : null}
           </div>
         </div>
       </div>
