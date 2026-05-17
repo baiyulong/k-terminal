@@ -11,6 +11,11 @@ const PROXY_HOST_KEY = "kterminal.proxy.host";
 const PROXY_PORT_KEY = "kterminal.proxy.port";
 const PROXY_BYPASS_KEY = "kterminal.proxy.bypass";
 
+const LOCAL_SHELL_KEY = "kterminal.local.shell";
+
+const readStoredLocalShell = (): string =>
+  (typeof window !== "undefined" && window.localStorage.getItem(LOCAL_SHELL_KEY)) || "";
+
 export const TERMINAL_FONT_FAMILIES = [
   "Cascadia Code",
   "Fira Code",
@@ -74,6 +79,8 @@ interface SettingsState {
   setProxyPort: (port: number) => void;
   proxyBypass: string;
   setProxyBypass: (bypass: string) => void;
+  localShell: string;
+  setLocalShell: (shell: string) => void;
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
@@ -124,5 +131,11 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   setProxyBypass: (bypass) => {
     if (typeof window !== "undefined") window.localStorage.setItem(PROXY_BYPASS_KEY, bypass);
     set({ proxyBypass: bypass });
+  },
+
+  localShell: readStoredLocalShell(),
+  setLocalShell: (shell) => {
+    if (typeof window !== "undefined") window.localStorage.setItem(LOCAL_SHELL_KEY, shell);
+    set({ localShell: shell });
   },
 }));
