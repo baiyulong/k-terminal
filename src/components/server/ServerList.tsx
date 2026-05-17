@@ -65,7 +65,7 @@ export function ServerList({
     <div className="flex-1 overflow-y-auto px-2 py-3">
       <ul className="space-y-2">
         {/* Pinned local machine entry — no context menu, no favorite */}
-        <li key={LOCAL_MACHINE_ID}>
+        <li>
           <div
             className={[
               "flex items-start gap-2 rounded-xl border p-3 transition",
@@ -82,6 +82,7 @@ export function ServerList({
                 void onLaunch(LOCAL_MACHINE_SERVER);
               }}
               className="min-w-0 flex-1 text-left"
+              aria-label="Open Local Machine shell"
             >
               <div className="flex items-center gap-2">
                 <MonitorIcon />
@@ -232,7 +233,7 @@ function MonitorIcon() {
       aria-hidden="true"
       viewBox="0 0 20 20"
       fill="none"
-      className="h-4 w-4 shrink-0 text-green-400"
+      className="h-4 w-4 shrink-0"
       stroke="currentColor"
       strokeLinecap="round"
       strokeLinejoin="round"
