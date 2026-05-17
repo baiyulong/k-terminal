@@ -47,6 +47,7 @@ pub fn run() {
             commands::settings_commands::export_data,
             commands::settings_commands::import_data,
             commands::settings_commands::get_app_info,
+            commands::settings_commands::list_system_fonts,
             // New embedded terminal commands
             commands::terminal_session_commands::connect_ssh_session,
             commands::terminal_session_commands::disconnect_ssh_session,

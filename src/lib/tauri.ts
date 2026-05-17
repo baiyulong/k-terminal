@@ -80,6 +80,7 @@ export const settingsApi = {
   exportData: () => invoke<string>("export_data"),
   importData: (json: string) => invoke<ImportResult>("import_data", { json }),
   getAppInfo: () => invoke<AppInfo>("get_app_info"),
+  listSystemFonts: () => invoke<string[]>("list_system_fonts"),
 };
 
 export const terminalSessionApi = {

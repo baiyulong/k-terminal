@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { terminalProfilesQueryKey } from "@/hooks/useTerminalProfiles";
 import { groupsListQueryKey, groupsTreeQueryKey } from "@/hooks/useGroups";
@@ -31,6 +31,37 @@ export function SettingsPage({
   const setTerminalFontSize = useSettingsStore((state) => state.setTerminalFontSize);
   const terminalFontFamily = useSettingsStore((state) => state.terminalFontFamily);
   const setTerminalFontFamily = useSettingsStore((state) => state.setTerminalFontFamily);
+  const [systemFonts, setSystemFonts] = useState<string[]>([...TERMINAL_FONT_FAMILIES]);
+
+  // Load system fonts from Rust (fc-list / PowerShell) with JS Font Access API fallback
+  useEffect(() => {
+    (async () => {
+      try {
+        const rustFonts = await settingsApi.listSystemFonts();
+        if (rustFonts.length > 0) {
+          setSystemFonts(rustFonts);
+          return;
+        }
+      } catch {
+        // Rust command unavailable
+      }
+      // Fallback: JS Font Access API (Chromium / Windows WebView2)
+      if ("queryLocalFonts" in window) {
+        try {
+          // @ts-expect-error Font Access API not yet in lib.dom.d.ts
+          const fonts: { family: string }[] = await window.queryLocalFonts();
+          const families = [...new Set(fonts.map((f) => f.family))].sort((a, b) =>
+            a.toLowerCase().localeCompare(b.toLowerCase()),
+          );
+          if (families.length > 0) {
+            setSystemFonts(families);
+          }
+        } catch {
+          // Permission denied or API unavailable
+        }
+      }
+    })();
+  }, []);
   const [lastImportResult, setLastImportResult] = useState<ImportResult | null>(
     null,
   );
@@ -188,16 +219,25 @@ export function SettingsPage({
             <label className="text-sm font-medium" htmlFor="terminal-font-family">
               Font family
             </label>
-            <select
-              id="terminal-font-family"
-              value={terminalFontFamily}
-              onChange={(e) => setTerminalFontFamily(e.target.value as typeof terminalFontFamily)}
-              className={inputClassName}
-            >
-              {TERMINAL_FONT_FAMILIES.map((f) => (
-                <option key={f} value={f}>{f}</option>
-              ))}
-            </select>
+            <div>
+              <input
+                id="terminal-font-family"
+                type="text"
+                list="font-family-list"
+                value={terminalFontFamily}
+                onChange={(e) => setTerminalFontFamily(e.target.value as typeof terminalFontFamily)}
+                placeholder="Type to search fonts…"
+                className={inputClassName}
+              />
+              <datalist id="font-family-list">
+                {systemFonts.map((f) => (
+                  <option key={f} value={f} />
+                ))}
+              </datalist>
+              <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+                {systemFonts.length} fonts available — type to search or select from the list
+              </p>
+            </div>
 
             <label className="text-sm font-medium" htmlFor="terminal-font-size">
               Font size

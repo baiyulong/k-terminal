@@ -88,14 +88,18 @@ export function TerminalView({ sessionId, isActive }: TerminalViewProps) {
     };
   }, [sessionId, sendInput]);
 
-  // Fit when the tab becomes active
+  // Fit and sync PTY size when the tab becomes active
   useEffect(() => {
     if (!isActive) return;
     const raf = requestAnimationFrame(() => {
-      fitAddonRef.current?.fit();
+      const fitAddon = fitAddonRef.current;
+      const terminal = terminalRef.current;
+      if (!fitAddon || !terminal) return;
+      fitAddon.fit();
+      resize(sessionId, terminal.cols, terminal.rows);
     });
     return () => cancelAnimationFrame(raf);
-  }, [isActive]);
+  }, [isActive, sessionId, resize]);
 
   // Resize observer → PTY resize
   useEffect(() => {
@@ -135,10 +139,7 @@ export function TerminalView({ sessionId, isActive }: TerminalViewProps) {
   }, [fontFamily, fontSize]);
 
   return (
-    <div
-      style={{ display: isActive ? "block" : "none" }}
-      className="relative h-full w-full overflow-hidden bg-[#0d1117]"
-    >
+    <div className="relative h-full w-full overflow-hidden bg-[#0d1117]">
       <div
         ref={containerRef}
         className="h-full w-full overflow-hidden bg-[#0d1117]"

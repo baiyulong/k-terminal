@@ -15,7 +15,7 @@ export const TERMINAL_FONT_FAMILIES = [
   "monospace",
 ] as const;
 
-export type TerminalFontFamily = (typeof TERMINAL_FONT_FAMILIES)[number];
+export type TerminalFontFamily = string;
 
 const isThemePreference = (value: string): value is ThemePreference =>
   value === "light" || value === "dark" || value === "system";
@@ -32,12 +32,9 @@ const readStoredFontSize = (): number => {
   return v >= 10 && v <= 24 ? v : 13;
 };
 
-const readStoredFontFamily = (): TerminalFontFamily => {
+const readStoredFontFamily = (): string => {
   if (typeof window === "undefined") return "Cascadia Code";
-  const v = window.localStorage.getItem(FONT_FAMILY_KEY);
-  return (TERMINAL_FONT_FAMILIES as readonly string[]).includes(v ?? "")
-    ? (v as TerminalFontFamily)
-    : "Cascadia Code";
+  return window.localStorage.getItem(FONT_FAMILY_KEY) ?? "Cascadia Code";
 };
 
 interface SettingsState {
@@ -45,8 +42,8 @@ interface SettingsState {
   setTheme: (theme: ThemePreference) => void;
   terminalFontSize: number;
   setTerminalFontSize: (size: number) => void;
-  terminalFontFamily: TerminalFontFamily;
-  setTerminalFontFamily: (family: TerminalFontFamily) => void;
+  terminalFontFamily: string;
+  setTerminalFontFamily: (family: string) => void;
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({

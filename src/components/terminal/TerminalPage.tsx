@@ -70,7 +70,10 @@ export function TerminalPage({ onOpenSettings }: TerminalPageProps) {
               <div
                 key={session.id}
                 className="absolute inset-0"
-                style={{ display: session.id === activeSessionId ? "block" : "none" }}
+                style={{
+                  visibility: session.id === activeSessionId ? "visible" : "hidden",
+                  pointerEvents: session.id === activeSessionId ? "auto" : "none",
+                }}
               >
                 <TerminalView
                   sessionId={session.id}
