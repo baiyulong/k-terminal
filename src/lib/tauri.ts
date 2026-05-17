@@ -83,3 +83,21 @@ export const settingsApi = {
   importData: (json: string) => invoke<ImportResult>("import_data", { json }),
   getAppInfo: () => invoke<AppInfo>("get_app_info"),
 };
+
+export const terminalSessionApi = {
+  connect: (
+    serverId: string,
+    cols?: number,
+    rows?: number,
+  ): Promise<string> =>
+    invoke("connect_ssh_session", { serverId, cols, rows }),
+
+  disconnect: (sessionId: string): Promise<void> =>
+    invoke("disconnect_ssh_session", { sessionId }),
+
+  sendInput: (sessionId: string, data: number[]): Promise<void> =>
+    invoke("terminal_input", { sessionId, data }),
+
+  resize: (sessionId: string, cols: number, rows: number): Promise<void> =>
+    invoke("terminal_resize", { sessionId, cols, rows }),
+};
