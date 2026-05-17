@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { copyTextToClipboard } from "@/lib/clipboard";
+import { LOCAL_MACHINE_ID, LOCAL_MACHINE_SERVER } from "@/lib/constants";
 import { sshApi } from "@/lib/tauri";
 import type { Server } from "@/lib/types";
 
@@ -52,6 +53,46 @@ export function ServerDetail({
             Choose a server from the sidebar to inspect connection settings,
             review authentication details, and prepare a connection.
           </p>
+        </div>
+      </section>
+    );
+  }
+
+  if (server.id === LOCAL_MACHINE_ID) {
+    return (
+      <section className="flex flex-1 flex-col overflow-y-auto bg-[hsl(var(--background))]">
+        <div className="border-b border-[hsl(var(--border))] px-6 py-6">
+          <div className="flex items-center gap-2 mb-1">
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 20 20"
+              fill="none"
+              className="h-4 w-4 shrink-0"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.6"
+            >
+              <rect x="2" y="3" width="16" height="11" rx="1.5" />
+              <path d="M7 17h6M10 14v3" />
+            </svg>
+            <h2 className="text-3xl font-semibold tracking-tight text-[hsl(var(--foreground))]">
+              Local Machine
+            </h2>
+          </div>
+          <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
+            Native shell session on this machine. No SSH connection required.
+          </p>
+        </div>
+        <div className="px-6 py-6">
+          <button
+            type="button"
+            aria-label="Connect to Local Machine"
+            onClick={() => onConnect(LOCAL_MACHINE_SERVER)}
+            className="rounded-lg bg-[hsl(var(--primary))] px-4 py-2 text-sm font-semibold text-[hsl(var(--primary-foreground))] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Connect
+          </button>
         </div>
       </section>
     );

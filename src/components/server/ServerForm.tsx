@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTerminalProfilesQuery } from "@/hooks/useTerminalProfiles";
 import type { GroupNode, Server } from "@/lib/types";
 import { useGroupStore } from "@/stores/groupStore";
+import { useSettingsStore } from "@/stores/settingsStore";
 
 export interface ServerFormValues {
   name: string;
@@ -24,6 +25,9 @@ export interface ServerFormValues {
   compression: boolean;
   agent_forward: boolean;
   port_forwards: string;
+  proxy_type: "global" | "none" | "http" | "socks5";
+  proxy_host: string;
+  proxy_port: number;
 }
 
 interface ServerFormProps {
@@ -81,6 +85,9 @@ function getInitialValues(
     compression: server?.compression ?? false,
     agent_forward: server?.agent_forward ?? false,
     port_forwards: server?.port_forwards ?? "",
+    proxy_type: server?.proxy_type ?? "global",
+    proxy_host: server?.proxy_host ?? "",
+    proxy_port: server?.proxy_port ?? 0,
   };
 }
 
@@ -101,6 +108,10 @@ export function ServerForm({
     [defaultGroupId, server],
   );
   const [formValues, setFormValues] = useState<ServerFormValues>(initialValues);
+
+  const globalProxyType = useSettingsStore((state) => state.proxyType);
+  const globalProxyHost = useSettingsStore((state) => state.proxyHost);
+  const globalProxyPort = useSettingsStore((state) => state.proxyPort);
 
   useEffect(() => {
     setFormValues(initialValues);
@@ -528,6 +539,70 @@ export function ServerForm({
               </div>
             </section>
           </fieldset>
+
+          <section className={sectionClassName}>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-[hsl(var(--muted-foreground))]">
+              Proxy
+            </h3>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div className="md:col-span-2">
+                <label className={labelClassName} htmlFor="server-proxy-type">
+                  Proxy type
+                </label>
+                <select
+                  id="server-proxy-type"
+                  value={formValues.proxy_type}
+                  onChange={(e) =>
+                    handleChange("proxy_type", e.target.value as ServerFormValues["proxy_type"])
+                  }
+                  className={inputClassName}
+                >
+                  <option value="global">
+                    Follow global
+                    {globalProxyType !== "none"
+                      ? ` (${globalProxyType.toUpperCase()} ${globalProxyHost}:${globalProxyPort})`
+                      : " (disabled)"}
+                  </option>
+                  <option value="none">Disabled</option>
+                  <option value="http">HTTP CONNECT</option>
+                  <option value="socks5">SOCKS5</option>
+                </select>
+              </div>
+
+              {(formValues.proxy_type === "http" || formValues.proxy_type === "socks5") && (
+                <>
+                  <div>
+                    <label className={labelClassName} htmlFor="server-proxy-host">
+                      Proxy host
+                    </label>
+                    <input
+                      id="server-proxy-host"
+                      type="text"
+                      value={formValues.proxy_host}
+                      onChange={(e) => handleChange("proxy_host", e.target.value)}
+                      placeholder="10.0.0.1"
+                      className={inputClassName}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClassName} htmlFor="server-proxy-port">
+                      Proxy port
+                    </label>
+                    <input
+                      id="server-proxy-port"
+                      type="number"
+                      value={formValues.proxy_port || ""}
+                      onChange={(e) => handleChange("proxy_port", Number(e.target.value))}
+                      placeholder="3128"
+                      min={1}
+                      max={65535}
+                      className={inputClassName}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          </section>
 
           <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[hsl(var(--border))] pt-4">
             <button

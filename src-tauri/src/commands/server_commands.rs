@@ -26,6 +26,9 @@ pub struct CreateServerRequest {
     pub compression: Option<bool>,
     pub agent_forward: Option<bool>,
     pub port_forwards: Option<String>,
+    pub proxy_type: Option<String>,
+    pub proxy_host: Option<String>,
+    pub proxy_port: Option<i32>,
 }
 
 #[tauri::command]
@@ -65,6 +68,9 @@ pub fn create_server(
         compression: request.compression.unwrap_or(false),
         agent_forward: request.agent_forward.unwrap_or(false),
         port_forwards: request.port_forwards,
+        proxy_type: request.proxy_type.unwrap_or_else(|| "global".to_string()),
+        proxy_host: request.proxy_host,
+        proxy_port: request.proxy_port,
     };
 
     ServerManager::create(&pool, new_server).map_err(|e| e.to_string())

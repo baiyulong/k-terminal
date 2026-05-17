@@ -29,6 +29,9 @@ pub struct Server {
     pub compression: bool,
     pub agent_forward: bool,
     pub port_forwards: Option<String>,
+    pub proxy_type: String,
+    pub proxy_host: Option<String>,
+    pub proxy_port: Option<i32>,
     pub last_connected_at: Option<NaiveDateTime>,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
@@ -58,6 +61,9 @@ pub struct NewServer {
     pub compression: bool,
     pub agent_forward: bool,
     pub port_forwards: Option<String>,
+    pub proxy_type: String,
+    pub proxy_host: Option<String>,
+    pub proxy_port: Option<i32>,
 }
 
 #[derive(Debug, AsChangeset, Deserialize)]
@@ -83,6 +89,9 @@ pub struct UpdateServer {
     pub compression: Option<bool>,
     pub agent_forward: Option<bool>,
     pub port_forwards: Option<String>,
+    pub proxy_type: Option<String>,
+    pub proxy_host: Option<String>,
+    pub proxy_port: Option<i32>,
 }
 
 #[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]

@@ -6,6 +6,16 @@ const STORAGE_KEY = "kterminal.theme";
 const FONT_SIZE_KEY = "kterminal.terminal.fontSize";
 const FONT_FAMILY_KEY = "kterminal.terminal.fontFamily";
 
+const PROXY_TYPE_KEY = "kterminal.proxy.type";
+const PROXY_HOST_KEY = "kterminal.proxy.host";
+const PROXY_PORT_KEY = "kterminal.proxy.port";
+const PROXY_BYPASS_KEY = "kterminal.proxy.bypass";
+
+const LOCAL_SHELL_KEY = "kterminal.local.shell";
+
+const readStoredLocalShell = (): string =>
+  (typeof window !== "undefined" && window.localStorage.getItem(LOCAL_SHELL_KEY)) || "";
+
 export const TERMINAL_FONT_FAMILIES = [
   "Cascadia Code",
   "Fira Code",
@@ -37,6 +47,23 @@ const readStoredFontFamily = (): string => {
   return window.localStorage.getItem(FONT_FAMILY_KEY) ?? "Cascadia Code";
 };
 
+const readStoredProxyType = (): "none" | "http" | "socks5" => {
+  const v = typeof window !== "undefined" ? window.localStorage.getItem(PROXY_TYPE_KEY) : null;
+  return (v === "http" || v === "socks5") ? v : "none";
+};
+
+const readStoredProxyHost = (): string =>
+  (typeof window !== "undefined" && window.localStorage.getItem(PROXY_HOST_KEY)) || "";
+
+const readStoredProxyPort = (): number => {
+  const v = Number(typeof window !== "undefined" ? window.localStorage.getItem(PROXY_PORT_KEY) : "0");
+  return v > 0 ? v : 0;
+};
+
+const readStoredProxyBypass = (): string =>
+  (typeof window !== "undefined" && window.localStorage.getItem(PROXY_BYPASS_KEY)) ||
+  "localhost\n127.0.0.1\n::1";
+
 interface SettingsState {
   theme: ThemePreference;
   setTheme: (theme: ThemePreference) => void;
@@ -44,6 +71,16 @@ interface SettingsState {
   setTerminalFontSize: (size: number) => void;
   terminalFontFamily: string;
   setTerminalFontFamily: (family: string) => void;
+  proxyType: "none" | "http" | "socks5";
+  setProxyType: (type: "none" | "http" | "socks5") => void;
+  proxyHost: string;
+  setProxyHost: (host: string) => void;
+  proxyPort: number;
+  setProxyPort: (port: number) => void;
+  proxyBypass: string;
+  setProxyBypass: (bypass: string) => void;
+  localShell: string;
+  setLocalShell: (shell: string) => void;
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
@@ -70,5 +107,35 @@ export const useSettingsStore = create<SettingsState>((set) => ({
       window.localStorage.setItem(FONT_FAMILY_KEY, family);
     }
     set({ terminalFontFamily: family });
+  },
+
+  proxyType: readStoredProxyType(),
+  setProxyType: (type) => {
+    if (typeof window !== "undefined") window.localStorage.setItem(PROXY_TYPE_KEY, type);
+    set({ proxyType: type });
+  },
+
+  proxyHost: readStoredProxyHost(),
+  setProxyHost: (host) => {
+    if (typeof window !== "undefined") window.localStorage.setItem(PROXY_HOST_KEY, host);
+    set({ proxyHost: host });
+  },
+
+  proxyPort: readStoredProxyPort(),
+  setProxyPort: (port) => {
+    if (typeof window !== "undefined") window.localStorage.setItem(PROXY_PORT_KEY, String(port));
+    set({ proxyPort: port });
+  },
+
+  proxyBypass: readStoredProxyBypass(),
+  setProxyBypass: (bypass) => {
+    if (typeof window !== "undefined") window.localStorage.setItem(PROXY_BYPASS_KEY, bypass);
+    set({ proxyBypass: bypass });
+  },
+
+  localShell: readStoredLocalShell(),
+  setLocalShell: (shell) => {
+    if (typeof window !== "undefined") window.localStorage.setItem(LOCAL_SHELL_KEY, shell);
+    set({ localShell: shell });
   },
 }));

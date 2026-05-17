@@ -70,6 +70,9 @@ struct ExportServer {
     compression: bool,
     agent_forward: bool,
     port_forwards: Option<String>,
+    proxy_type: String,
+    proxy_host: Option<String>,
+    proxy_port: Option<i32>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -127,6 +130,12 @@ struct ImportServer {
     agent_forward: bool,
     #[serde(default)]
     port_forwards: Option<String>,
+    #[serde(default = "default_proxy_type")]
+    proxy_type: String,
+    #[serde(default)]
+    proxy_host: Option<String>,
+    #[serde(default)]
+    proxy_port: Option<i32>,
 }
 
 pub fn get_config_dir() -> PathBuf {
@@ -278,6 +287,9 @@ pub fn import_servers(pool: &DbPool, json: &str) -> Result<ImportResult, ConfigE
                     compression: server.compression,
                     agent_forward: server.agent_forward,
                     port_forwards: normalize_optional_text(server.port_forwards),
+                    proxy_type: server.proxy_type,
+                    proxy_host: server.proxy_host,
+                    proxy_port: server.proxy_port,
                 })
                 .execute(conn)?;
 
@@ -385,6 +397,10 @@ fn default_true() -> bool {
     true
 }
 
+fn default_proxy_type() -> String {
+    "global".to_string()
+}
+
 impl From<Group> for ExportGroup {
     fn from(group: Group) -> Self {
         Self {
@@ -418,6 +434,9 @@ impl From<Server> for ExportServer {
             compression: server.compression,
             agent_forward: server.agent_forward,
             port_forwards: server.port_forwards,
+            proxy_type: server.proxy_type,
+            proxy_host: server.proxy_host,
+            proxy_port: server.proxy_port,
         }
     }
 }
@@ -484,6 +503,9 @@ mod tests {
                 compression: false,
                 agent_forward: false,
                 port_forwards: None,
+                proxy_type: "global".to_string(),
+                proxy_host: None,
+                proxy_port: None,
             })
             .execute(&mut conn)
             .unwrap();

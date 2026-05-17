@@ -30,3 +30,5 @@ tokio = { version = "1", features = ["full"] }
 thiserror = "2"
 log = "0.4"
 dirs = "6"
+tokio-socks = "0.5"
+portable-pty = "0.8"
