@@ -212,19 +212,20 @@ async fn build_proxied_stream(
             let mut resp = Vec::with_capacity(256);
             let mut buf = [0u8; 1];
             loop {
+                if resp.len() >= 4096 {
+                    return Err("HTTP proxy response too large".into());
+                }
                 stream.read_exact(&mut buf).await?;
                 resp.push(buf[0]);
                 if resp.ends_with(b"\r\n\r\n") {
                     break;
                 }
-                if resp.len() > 4096 {
-                    return Err("HTTP proxy response too large".into());
-                }
             }
 
             let resp_str = String::from_utf8_lossy(&resp);
             let status_line = resp_str.lines().next().unwrap_or("");
-            if !status_line.contains(" 200") {
+            let status_code = status_line.split_whitespace().nth(1).unwrap_or("");
+            if status_code != "200" {
                 return Err(format!("HTTP proxy rejected: {}", status_line.trim()).into());
             }
             eprintln!("[proxy] HTTP CONNECT OK");
@@ -247,10 +248,11 @@ async fn run_session(
     let stream = build_proxied_stream(&config.host, config.port, config.proxy.as_ref())
         .await
         .map_err(|e| { eprintln!("[ssh] TCP connect failed: {}", e); e })?;
-    eprintln!("[ssh] TCP+handshake OK");
+    eprintln!("[ssh] TCP connect OK");
     let mut ssh_handle: Handle<SshClientHandler> =
         client::connect_stream(russh_config, stream, SshClientHandler).await
         .map_err(|e| { eprintln!("[ssh] SSH handshake failed: {}", e); e })?;
+    eprintln!("[ssh] TCP+handshake OK");
 
     // 2. Authenticate
     eprintln!("[ssh] Authenticating as '{}'", config.username);
