@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::db::DbPool;
 use crate::managers::server_manager::ServerManager;
 use crate::managers::ssh_session_manager::{
-    establish_session, SshAuthMethod, SshConnectConfig, SshSessionManager, TerminalChannelMessage,
+    establish_session, ProxyConfig, SshAuthMethod, SshConnectConfig, SshSessionManager, TerminalChannelMessage,
 };
 use crate::security::keyring::CredentialStore;
 
@@ -17,6 +17,7 @@ pub async fn connect_ssh_session(
     channel: Channel<TerminalChannelMessage>,
     cols: Option<u16>,
     rows: Option<u16>,
+    proxy: Option<ProxyConfig>,
 ) -> Result<String, String> {
     let session_id = Uuid::new_v4().to_string();
 
@@ -59,7 +60,7 @@ pub async fn connect_ssh_session(
         initial_cols: cols.unwrap_or(220),
         initial_rows: rows.unwrap_or(50),
         channel,
-        proxy: None,
+        proxy,
     };
 
     let manager_clone = ssh_manager.inner().clone();
