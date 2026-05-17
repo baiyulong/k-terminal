@@ -9,7 +9,7 @@ export interface GlobalProxySettings {
   proxyType: "none" | "http" | "socks5";
   proxyHost: string;
   proxyPort: number;
-  proxyBypass: string; // newline-separated bypass patterns
+  proxyBypass: string; // newline- or comma-separated bypass patterns
 }
 
 /**
@@ -23,7 +23,7 @@ export interface GlobalProxySettings {
 export function matchesBypass(host: string, bypassPatterns: string): boolean {
   const h = host.toLowerCase();
   for (const raw of bypassPatterns.split(/[\n,]/)) {
-    const pattern = raw.trim().replace(/^#+.*/, "").trim(); // ignore comments
+    const pattern = raw.trim().replace(/#.*$/, "").trim(); // strip full-line and inline comments
     if (!pattern) continue;
     const p = pattern.toLowerCase();
 
@@ -49,16 +49,18 @@ export function matchesBypass(host: string, bypassPatterns: string): boolean {
   return false;
 }
 
+type ServerProxyType = "global" | "none" | "http" | "socks5";
+
 /**
  * Resolves the effective ProxyConfig for a connection.
  *
- * Priority: per-server override > global proxy.
- * Bypass list is checked last; if host matches, returns null (no proxy).
+ * Priority: bypass list (always wins) > per-server override > global proxy.
+ * If targetHost matches the bypass list, returns null immediately (direct connection).
  *
  * Returns null when no proxy should be used.
  */
 export function resolveProxy(
-  serverProxyType: string,
+  serverProxyType: ServerProxyType,
   serverProxyHost: string | undefined,
   serverProxyPort: number | undefined,
   global: GlobalProxySettings,
@@ -83,6 +85,7 @@ export function resolveProxy(
     effectivePort = serverProxyPort ?? 0;
   }
 
+  // Empty host and port 0 both indicate "not configured" — treat as no proxy
   if (effectiveType === "none" || !effectiveHost || !effectivePort) return null;
 
   return {

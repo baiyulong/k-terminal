@@ -48,7 +48,7 @@ export interface CreateServerRequest {
   compression?: boolean;
   agent_forward?: boolean;
   port_forwards?: string;
-  proxy_type?: string;
+  proxy_type?: "global" | "none" | "http" | "socks5";
   proxy_host?: string;
   proxy_port?: number;
 }
@@ -74,7 +74,7 @@ export interface UpdateServerRequest {
   compression?: boolean;
   agent_forward?: boolean;
   port_forwards?: string;
-  proxy_type?: string;
+  proxy_type?: "global" | "none" | "http" | "socks5";
   proxy_host?: string;
   proxy_port?: number;
 }
