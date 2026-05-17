@@ -114,7 +114,7 @@ impl LocalPtyManager {
             child: child_arc,
         };
 
-        self.sessions.lock().unwrap().insert(session_id.clone(), handle);
+        self.sessions.lock().unwrap_or_else(|e| e.into_inner()).insert(session_id.clone(), handle);
 
         // Emit "connected" immediately
         let _ = channel.send(TerminalChannelMessage::Status(TerminalStatusEvent {
@@ -137,15 +137,17 @@ impl LocalPtyManager {
                     }
                 }
             }
-            // Reap the child to prevent zombie processes
-            if let Ok(mut child_guard) = child_for_thread.lock() {
-                let _ = child_guard.0.wait();
-            }
+            // Reap the child and capture exit status to distinguish clean vs unexpected exit
+            let exit_clean = if let Ok(mut child_guard) = child_for_thread.lock() {
+                child_guard.0.wait().map(|s| s.success()).unwrap_or(false)
+            } else {
+                false
+            };
             // Shell exited or PTY closed
             let _ = channel.send(TerminalChannelMessage::Status(TerminalStatusEvent {
                 session_id,
-                status: "error".to_string(),
-                reason: Some("Shell exited".to_string()),
+                status: if exit_clean { "disconnected" } else { "error" }.to_string(),
+                reason: if exit_clean { None } else { Some("Shell exited unexpectedly".to_string()) },
             }));
         });
 
@@ -154,7 +156,7 @@ impl LocalPtyManager {
 
     /// Kill the child process and remove the session.
     pub fn remove(&self, session_id: &str) -> bool {
-        let mut sessions = self.sessions.lock().unwrap();
+        let mut sessions = self.sessions.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(handle) = sessions.remove(session_id) {
             handle.kill();
             true
@@ -166,7 +168,7 @@ impl LocalPtyManager {
     /// Send raw bytes to the shell's stdin.
     pub fn send_input(&self, session_id: &str, data: Vec<u8>) -> bool {
         let writer_arc = {
-            let sessions = self.sessions.lock().unwrap();
+            let sessions = self.sessions.lock().unwrap_or_else(|e| e.into_inner());
             sessions.get(session_id).map(|h| h.writer.clone())
         };
         if let Some(arc) = writer_arc {
@@ -180,7 +182,7 @@ impl LocalPtyManager {
     /// Resize the PTY to the new dimensions.
     pub fn send_resize(&self, session_id: &str, cols: u16, rows: u16) -> bool {
         let master_arc = {
-            let sessions = self.sessions.lock().unwrap();
+            let sessions = self.sessions.lock().unwrap_or_else(|e| e.into_inner());
             sessions.get(session_id).map(|h| h.master.clone())
         };
         if let Some(arc) = master_arc {

@@ -86,28 +86,32 @@ pub async fn disconnect_ssh_session(
     }
 }
 
+// async required by Tauri's State<> parameter even though work is sync/thread-based
 #[tauri::command]
 pub async fn connect_local_session(
     channel: tauri::ipc::Channel<TerminalChannelMessage>,
     cols: Option<u16>,
     rows: Option<u16>,
     proxy: Option<ProxyConfig>,
-    state: tauri::State<'_, LocalPtyManager>,
+    local_state: tauri::State<'_, LocalPtyManager>,
 ) -> Result<String, String> {
     let cols = cols.unwrap_or(80);
     let rows = rows.unwrap_or(24);
     let session_id = Uuid::new_v4().to_string();
-    state.connect(session_id.clone(), channel, cols, rows, proxy)?;
+    local_state.connect(session_id.clone(), channel, cols, rows, proxy)?;
     Ok(session_id)
 }
 
 #[tauri::command]
 pub async fn disconnect_local_session(
     session_id: String,
-    state: tauri::State<'_, LocalPtyManager>,
+    local_state: tauri::State<'_, LocalPtyManager>,
 ) -> Result<(), String> {
-    state.remove(&session_id);
-    Ok(())
+    if local_state.remove(&session_id) {
+        Ok(())
+    } else {
+        Err(format!("Session '{}' not found", session_id))
+    }
 }
 
 #[tauri::command]
@@ -118,6 +122,7 @@ pub async fn terminal_input(
     local_state: tauri::State<'_, LocalPtyManager>,
 ) -> Result<(), String> {
     // Try SSH sessions first, then local PTY
+    // Clone because SSH send_input consumes data; local PTY needs it if SSH misses
     if ssh_state.send_input(&session_id, data.clone()).await {
         return Ok(());
     }
