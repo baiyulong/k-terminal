@@ -42,6 +42,7 @@ export function SettingsPage({
   const localShell = useSettingsStore((state) => state.localShell);
   const setLocalShell = useSettingsStore((state) => state.setLocalShell);
   const [systemFonts, setSystemFonts] = useState<string[]>([...TERMINAL_FONT_FAMILIES]);
+  const shellSelectRef = useRef<HTMLSelectElement>(null);
 
   const isWindows = typeof navigator !== "undefined" &&
     navigator.userAgent.toLowerCase().includes("windows");
@@ -71,6 +72,25 @@ export function SettingsPage({
   const dropdownValue = isCustomShell ? "__custom__" : localShell;
 
   console.log("[k-terminal] SettingsPage render: isWindows=", isWindows, "localShell=", JSON.stringify(localShell), "dropdownValue=", JSON.stringify(dropdownValue));
+
+  // Native DOM event listener - bypasses React's synthetic event system for <select>
+  // (WebView2 has a known issue where <select> change events don't bubble through React delegation)
+  useEffect(() => {
+    const el = shellSelectRef.current;
+    if (!el) return;
+    const handler = () => {
+      const value = el.value;
+      console.log("[k-terminal] Native select change event: value=", JSON.stringify(value));
+      if (value === "__custom__") {
+        if (el.dataset.wasCustom !== "true") setLocalShell("");
+      } else {
+        setLocalShell(value);
+      }
+      el.dataset.wasCustom = value === "__custom__" ? "true" : "false";
+    };
+    el.addEventListener("change", handler);
+    return () => el.removeEventListener("change", handler);
+  }, [setLocalShell]);
 
   // Load system fonts from Rust (fc-list / PowerShell) with JS Font Access API fallback
   useEffect(() => {
@@ -326,6 +346,7 @@ export function SettingsPage({
               <div className="flex gap-2">
                 <select
                   id="shell-select"
+                  ref={shellSelectRef}
                   className={inputClassName + " w-56"}
                   value={dropdownValue}
                   onChange={(e) => {
