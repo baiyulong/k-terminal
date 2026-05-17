@@ -71,6 +71,7 @@ impl LocalPtyManager {
                 #[cfg(not(windows))]
                 { std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string()) }
             });
+        println!("[local-pty] Spawning shell: {:?}", shell);
 
         let mut cmd = CommandBuilder::new(&shell);
         cmd.env("TERM", "xterm-256color");

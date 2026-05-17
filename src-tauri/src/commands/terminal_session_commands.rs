@@ -99,6 +99,7 @@ pub async fn connect_local_session(
     let cols = cols.unwrap_or(80);
     let rows = rows.unwrap_or(24);
     let session_id = Uuid::new_v4().to_string();
+    println!("[local-pty] connect_local_session: shell={:?}", shell);
     local_state.connect(session_id.clone(), channel, cols, rows, proxy, shell)?;
     Ok(session_id)
 }
