@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
+import { Channel } from "@tauri-apps/api/core";
 import type {
   AppInfo,
-  ConnectionLog,
   CreateGroupRequest,
   CreateServerRequest,
   CreateTerminalProfileRequest,
@@ -17,6 +17,10 @@ import type {
   UpdateServerRequest,
   UpdateTerminalProfileRequest,
 } from "./types";
+
+export type TerminalChannelMessage =
+  | { type: "Data"; payload: { session_id: string; data: number[] } }
+  | { type: "Status"; payload: { session_id: string; status: string; reason?: string } };
 
 export const serverApi = {
   list: () => invoke<Server[]>("list_servers"),
@@ -56,12 +60,6 @@ export const sshApi = {
     invoke<string>("get_ssh_command_preview", { serverId }),
 };
 
-export const terminalApi = {
-  launch: (serverId: string) => invoke<void>("launch_terminal", { serverId }),
-  getRecentConnections: (limit?: number) =>
-    invoke<ConnectionLog[]>("get_recent_connections", { limit }),
-};
-
 export const terminalProfileApi = {
   list: () => invoke<TerminalProfile[]>("list_terminal_profiles"),
   get: (id: string) => invoke<TerminalProfile>("get_terminal_profile", { id }),
@@ -82,4 +80,24 @@ export const settingsApi = {
   exportData: () => invoke<string>("export_data"),
   importData: (json: string) => invoke<ImportResult>("import_data", { json }),
   getAppInfo: () => invoke<AppInfo>("get_app_info"),
+  listSystemFonts: () => invoke<string[]>("list_system_fonts"),
+};
+
+export const terminalSessionApi = {
+  connect: (
+    serverId: string,
+    channel: Channel<TerminalChannelMessage>,
+    cols?: number,
+    rows?: number,
+  ): Promise<string> =>
+    invoke("connect_ssh_session", { serverId, channel, cols, rows }),
+
+  disconnect: (sessionId: string): Promise<void> =>
+    invoke("disconnect_ssh_session", { sessionId }),
+
+  sendInput: (sessionId: string, data: number[]): Promise<void> =>
+    invoke("terminal_input", { sessionId, data }),
+
+  resize: (sessionId: string, cols: number, rows: number): Promise<void> =>
+    invoke("terminal_resize", { sessionId, cols, rows }),
 };

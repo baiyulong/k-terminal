@@ -13,7 +13,12 @@
     "type": "git",
     "url": "git+https://github.com/baiyulong/k-terminal.git"
   },
-  "keywords": ["ssh", "terminal", "tauri", "server-management"],
+  "keywords": [
+    "ssh",
+    "terminal",
+    "tauri",
+    "server-management"
+  ],
   "author": "",
   "license": "MIT",
   "bugs": {
@@ -24,6 +29,8 @@
     "@tanstack/react-query": "^5.100.10",
     "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/plugin-shell": "^2.3.5",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "zustand": "^5.0.13"

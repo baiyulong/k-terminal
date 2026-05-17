@@ -1,16 +1,15 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { terminalProfilesQueryKey } from "@/hooks/useTerminalProfiles";
 import { groupsListQueryKey, groupsTreeQueryKey } from "@/hooks/useGroups";
 import { serversQueryKey } from "@/hooks/useServers";
 import { settingsApi, terminalProfileApi } from "@/lib/tauri";
 import type { ImportResult } from "@/lib/types";
-import { useSettingsStore } from "@/stores/settingsStore";
+import { useSettingsStore, TERMINAL_FONT_FAMILIES } from "@/stores/settingsStore";
 import { useToast } from "@/components/ui/Toast";
 
 interface SettingsPageProps {
   onNavigateHome: () => void;
-  onOpenTerminalProfiles: () => void;
 }
 
 const sectionClassName =
@@ -22,13 +21,47 @@ const buttonClassName =
 
 export function SettingsPage({
   onNavigateHome,
-  onOpenTerminalProfiles,
 }: SettingsPageProps) {
   const toast = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const theme = useSettingsStore((state) => state.theme);
   const setTheme = useSettingsStore((state) => state.setTheme);
+  const terminalFontSize = useSettingsStore((state) => state.terminalFontSize);
+  const setTerminalFontSize = useSettingsStore((state) => state.setTerminalFontSize);
+  const terminalFontFamily = useSettingsStore((state) => state.terminalFontFamily);
+  const setTerminalFontFamily = useSettingsStore((state) => state.setTerminalFontFamily);
+  const [systemFonts, setSystemFonts] = useState<string[]>([...TERMINAL_FONT_FAMILIES]);
+
+  // Load system fonts from Rust (fc-list / PowerShell) with JS Font Access API fallback
+  useEffect(() => {
+    (async () => {
+      try {
+        const rustFonts = await settingsApi.listSystemFonts();
+        if (rustFonts.length > 0) {
+          setSystemFonts(rustFonts);
+          return;
+        }
+      } catch {
+        // Rust command unavailable
+      }
+      // Fallback: JS Font Access API (Chromium / Windows WebView2)
+      if ("queryLocalFonts" in window) {
+        try {
+          // @ts-expect-error Font Access API not yet in lib.dom.d.ts
+          const fonts: { family: string }[] = await window.queryLocalFonts();
+          const families = [...new Set(fonts.map((f) => f.family))].sort((a, b) =>
+            a.toLowerCase().localeCompare(b.toLowerCase()),
+          );
+          if (families.length > 0) {
+            setSystemFonts(families);
+          }
+        } catch {
+          // Permission denied or API unavailable
+        }
+      }
+    })();
+  }, []);
   const [lastImportResult, setLastImportResult] = useState<ImportResult | null>(
     null,
   );
@@ -175,18 +208,80 @@ export function SettingsPage({
         <section className={sectionClassName}>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
+              <h2 className="text-lg font-semibold">Terminal Display</h2>
+              <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+                Customize the font displayed in embedded terminal sessions.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 md:grid-cols-[minmax(0,16rem)_1fr] md:items-center">
+            <label className="text-sm font-medium" htmlFor="terminal-font-family">
+              Font family
+            </label>
+            <div>
+              <input
+                id="terminal-font-family"
+                type="text"
+                list="font-family-list"
+                value={terminalFontFamily}
+                onChange={(e) => setTerminalFontFamily(e.target.value as typeof terminalFontFamily)}
+                placeholder="Type to search fonts…"
+                className={inputClassName}
+              />
+              <datalist id="font-family-list">
+                {systemFonts.map((f) => (
+                  <option key={f} value={f} />
+                ))}
+              </datalist>
+              <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+                {systemFonts.length} fonts available — type to search or select from the list
+              </p>
+            </div>
+
+            <label className="text-sm font-medium" htmlFor="terminal-font-size">
+              Font size
+            </label>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                aria-label="Decrease font size"
+                onClick={() => setTerminalFontSize(terminalFontSize - 1)}
+                disabled={terminalFontSize <= 10}
+                className={buttonClassName + " px-3"}
+              >
+                −
+              </button>
+              <input
+                id="terminal-font-size"
+                type="number"
+                min={10}
+                max={24}
+                value={terminalFontSize}
+                onChange={(e) => setTerminalFontSize(Number(e.target.value))}
+                className={inputClassName + " w-20 text-center"}
+              />
+              <button
+                type="button"
+                aria-label="Increase font size"
+                onClick={() => setTerminalFontSize(terminalFontSize + 1)}
+                disabled={terminalFontSize >= 24}
+                className={buttonClassName + " px-3"}
+              >
+                +
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section className={sectionClassName}>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
               <h2 className="text-lg font-semibold">Terminal Profiles</h2>
               <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
                 Pick a default launcher and manage platform-specific terminal presets.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={onOpenTerminalProfiles}
-              className={buttonClassName}
-            >
-              Manage Profiles
-            </button>
           </div>
 
           <div className="mt-5 grid gap-4 md:grid-cols-[minmax(0,16rem)_1fr] md:items-start">
