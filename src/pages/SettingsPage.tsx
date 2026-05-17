@@ -31,6 +31,14 @@ export function SettingsPage({
   const setTerminalFontSize = useSettingsStore((state) => state.setTerminalFontSize);
   const terminalFontFamily = useSettingsStore((state) => state.terminalFontFamily);
   const setTerminalFontFamily = useSettingsStore((state) => state.setTerminalFontFamily);
+  const proxyType = useSettingsStore((state) => state.proxyType);
+  const setProxyType = useSettingsStore((state) => state.setProxyType);
+  const proxyHost = useSettingsStore((state) => state.proxyHost);
+  const setProxyHost = useSettingsStore((state) => state.setProxyHost);
+  const proxyPort = useSettingsStore((state) => state.proxyPort);
+  const setProxyPort = useSettingsStore((state) => state.setProxyPort);
+  const proxyBypass = useSettingsStore((state) => state.proxyBypass);
+  const setProxyBypass = useSettingsStore((state) => state.setProxyBypass);
   const [systemFonts, setSystemFonts] = useState<string[]>([...TERMINAL_FONT_FAMILIES]);
 
   // Load system fonts from Rust (fc-list / PowerShell) with JS Font Access API fallback
@@ -270,6 +278,97 @@ export function SettingsPage({
               >
                 +
               </button>
+            </div>
+          </div>
+        </section>
+
+        <section className={sectionClassName}>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold">Proxy</h2>
+              <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+                Route SSH connections through an HTTP CONNECT or SOCKS5 proxy.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 md:grid-cols-[minmax(0,16rem)_1fr] md:items-start">
+            <label className="text-sm font-medium" htmlFor="proxy-type">
+              Proxy type
+            </label>
+            <select
+              id="proxy-type"
+              value={proxyType}
+              onChange={(e) => setProxyType(e.target.value as typeof proxyType)}
+              className={inputClassName}
+            >
+              <option value="none">Disabled</option>
+              <option value="http">HTTP CONNECT (port 3128, Squid…)</option>
+              <option value="socks5">SOCKS5 (port 1080, v2ray, clash…)</option>
+            </select>
+
+            <label
+              className={[
+                "text-sm font-medium",
+                proxyType === "none" ? "opacity-40" : "",
+              ].join(" ")}
+              htmlFor="proxy-host"
+            >
+              Proxy address
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="proxy-host"
+                type="text"
+                disabled={proxyType === "none"}
+                value={proxyHost}
+                onChange={(e) => setProxyHost(e.target.value)}
+                placeholder="10.0.0.1"
+                className={inputClassName + (proxyType === "none" ? " opacity-40" : "")}
+              />
+              <input
+                id="proxy-port"
+                type="number"
+                disabled={proxyType === "none"}
+                value={proxyPort || ""}
+                onChange={(e) => setProxyPort(Number(e.target.value))}
+                placeholder="3128"
+                min={1}
+                max={65535}
+                className={
+                  inputClassName +
+                  " w-28 shrink-0" +
+                  (proxyType === "none" ? " opacity-40" : "")
+                }
+              />
+            </div>
+
+            <label
+              className={[
+                "text-sm font-medium",
+                proxyType === "none" ? "opacity-40" : "",
+              ].join(" ")}
+              htmlFor="proxy-bypass"
+            >
+              Bypass list
+            </label>
+            <div>
+              <textarea
+                id="proxy-bypass"
+                disabled={proxyType === "none"}
+                value={proxyBypass}
+                onChange={(e) => setProxyBypass(e.target.value)}
+                rows={4}
+                placeholder={"localhost\n127.0.0.1\n10.*\n*.internal.com"}
+                className={
+                  inputClassName +
+                  " resize-y font-mono text-xs" +
+                  (proxyType === "none" ? " opacity-40" : "")
+                }
+              />
+              <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+                One rule per line. Supports exact IPs, domains, IP prefix wildcards (10.*), and domain suffixes (*.corp.com).
+              </p>
             </div>
           </div>
         </section>
