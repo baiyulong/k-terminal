@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { Server } from "@/lib/types";
 import { ServerPopover } from "./ServerPopover";
 
@@ -6,14 +5,17 @@ interface CollapsedSidebarProps {
   servers: Server[];
   onSelectServer: (server: Server) => void;
   onOpenSettings: () => void;
+  isPopoverOpen: boolean;
+  onTogglePopover: () => void;
 }
 
 export function CollapsedSidebar({
   servers,
   onSelectServer,
   onOpenSettings,
+  isPopoverOpen,
+  onTogglePopover,
 }: CollapsedSidebarProps) {
-  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
   return (
     <div className="relative flex h-full w-[42px] flex-col items-center border-r border-[#30363d] bg-[#161b22] py-3">
@@ -21,7 +23,7 @@ export function CollapsedSidebar({
       <button
         type="button"
         title="Server list"
-        onClick={() => setIsPopoverOpen((v) => !v)}
+        onClick={() => onTogglePopover()}
         className={[
           "flex h-8 w-8 items-center justify-center rounded text-lg transition-colors",
           isPopoverOpen
@@ -49,7 +51,7 @@ export function CollapsedSidebar({
         <ServerPopover
           servers={servers}
           onSelectServer={onSelectServer}
-          onClose={() => setIsPopoverOpen(false)}
+          onClose={() => onTogglePopover()}
         />
       )}
     </div>

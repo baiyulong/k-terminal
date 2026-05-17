@@ -5,6 +5,7 @@ import "@xterm/xterm/css/xterm.css";
 import { useTerminalActions } from "@/hooks/useTerminalSession";
 import { registerDataHandler, unregisterDataHandler } from "@/lib/terminalChannels";
 import { useTerminalSessionStore } from "@/stores/terminalSessionStore";
+import { useSettingsStore } from "@/stores/settingsStore";
 
 interface TerminalViewProps {
   sessionId: string;
@@ -19,6 +20,8 @@ export function TerminalView({ sessionId, isActive }: TerminalViewProps) {
     state.sessions.find((s) => s.id === sessionId),
   );
   const { sendInput, resize } = useTerminalActions();
+  const fontFamily = useSettingsStore((state) => state.terminalFontFamily);
+  const fontSize = useSettingsStore((state) => state.terminalFontSize);
 
   // Create xterm instance on mount
   useEffect(() => {
@@ -48,8 +51,8 @@ export function TerminalView({ sessionId, isActive }: TerminalViewProps) {
         white: "#b1bac4",
         brightWhite: "#f0f6fc",
       },
-      fontFamily: '"Cascadia Code", "Fira Code", "JetBrains Mono", monospace',
-      fontSize: 13,
+      fontFamily,
+      fontSize,
       cursorBlink: true,
       allowProposedApi: true,
     });
@@ -120,6 +123,16 @@ export function TerminalView({ sessionId, isActive }: TerminalViewProps) {
     registerDataHandler(sessionId, handleData);
     return () => unregisterDataHandler(sessionId);
   }, [sessionId, handleData]);
+
+  // Apply font changes live without remounting the terminal
+  useEffect(() => {
+    const terminal = terminalRef.current;
+    const fitAddon = fitAddonRef.current;
+    if (!terminal) return;
+    terminal.options.fontFamily = fontFamily;
+    terminal.options.fontSize = fontSize;
+    fitAddon?.fit();
+  }, [fontFamily, fontSize]);
 
   return (
     <div

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useTerminalSessionStore } from "@/stores/terminalSessionStore";
 import { useTerminalActions } from "@/hooks/useTerminalSession";
 import { useServersQuery } from "@/hooks/useServers";
@@ -14,6 +15,7 @@ interface TerminalPageProps {
 export function TerminalPage({ onOpenSettings }: TerminalPageProps) {
   useServersQuery(); // keep server list fresh
   const servers = useServerStore((state) => state.servers);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const sessions = useTerminalSessionStore((state) => state.sessions);
   const activeSessionId = useTerminalSessionStore(
@@ -26,16 +28,12 @@ export function TerminalPage({ onOpenSettings }: TerminalPageProps) {
   const { connect, disconnect } = useTerminalActions();
 
   const handleSelectServer = async (server: Server) => {
+    setIsSidebarOpen(false);
     await connect(server.id, server.name);
   };
 
   const handleCloseTab = async (sessionId: string) => {
     await disconnect(sessionId);
-  };
-
-  const handleAddTab = () => {
-    // The + button is a hint to open the server list via the sidebar
-    // The CollapsedSidebar handles this independently
   };
 
   return (
@@ -45,6 +43,8 @@ export function TerminalPage({ onOpenSettings }: TerminalPageProps) {
         servers={servers}
         onSelectServer={handleSelectServer}
         onOpenSettings={onOpenSettings}
+        isPopoverOpen={isSidebarOpen}
+        onTogglePopover={() => setIsSidebarOpen((v) => !v)}
       />
 
       {/* Terminal area */}
@@ -54,7 +54,7 @@ export function TerminalPage({ onOpenSettings }: TerminalPageProps) {
           activeSessionId={activeSessionId}
           onSelectTab={setActiveSession}
           onCloseTab={handleCloseTab}
-          onAddTab={handleAddTab}
+          onAddTab={() => setIsSidebarOpen((v) => !v)}
         />
 
         {/* Stack all TerminalViews; only active is visible */}

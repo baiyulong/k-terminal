@@ -5,7 +5,7 @@ import { groupsListQueryKey, groupsTreeQueryKey } from "@/hooks/useGroups";
 import { serversQueryKey } from "@/hooks/useServers";
 import { settingsApi, terminalProfileApi } from "@/lib/tauri";
 import type { ImportResult } from "@/lib/types";
-import { useSettingsStore } from "@/stores/settingsStore";
+import { useSettingsStore, TERMINAL_FONT_FAMILIES } from "@/stores/settingsStore";
 import { useToast } from "@/components/ui/Toast";
 
 interface SettingsPageProps {
@@ -27,6 +27,10 @@ export function SettingsPage({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const theme = useSettingsStore((state) => state.theme);
   const setTheme = useSettingsStore((state) => state.setTheme);
+  const terminalFontSize = useSettingsStore((state) => state.terminalFontSize);
+  const setTerminalFontSize = useSettingsStore((state) => state.setTerminalFontSize);
+  const terminalFontFamily = useSettingsStore((state) => state.terminalFontFamily);
+  const setTerminalFontFamily = useSettingsStore((state) => state.setTerminalFontFamily);
   const [lastImportResult, setLastImportResult] = useState<ImportResult | null>(
     null,
   );
@@ -167,6 +171,66 @@ export function SettingsPage({
               <option value="dark">Dark</option>
               <option value="system">System</option>
             </select>
+          </div>
+        </section>
+
+        <section className={sectionClassName}>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold">Terminal Display</h2>
+              <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+                Customize the font displayed in embedded terminal sessions.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 md:grid-cols-[minmax(0,16rem)_1fr] md:items-center">
+            <label className="text-sm font-medium" htmlFor="terminal-font-family">
+              Font family
+            </label>
+            <select
+              id="terminal-font-family"
+              value={terminalFontFamily}
+              onChange={(e) => setTerminalFontFamily(e.target.value as typeof terminalFontFamily)}
+              className={inputClassName}
+            >
+              {TERMINAL_FONT_FAMILIES.map((f) => (
+                <option key={f} value={f}>{f}</option>
+              ))}
+            </select>
+
+            <label className="text-sm font-medium" htmlFor="terminal-font-size">
+              Font size
+            </label>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                aria-label="Decrease font size"
+                onClick={() => setTerminalFontSize(terminalFontSize - 1)}
+                disabled={terminalFontSize <= 10}
+                className={buttonClassName + " px-3"}
+              >
+                −
+              </button>
+              <input
+                id="terminal-font-size"
+                type="number"
+                min={10}
+                max={24}
+                value={terminalFontSize}
+                onChange={(e) => setTerminalFontSize(Number(e.target.value))}
+                className={inputClassName + " w-20 text-center"}
+              />
+              <button
+                type="button"
+                aria-label="Increase font size"
+                onClick={() => setTerminalFontSize(terminalFontSize + 1)}
+                disabled={terminalFontSize >= 24}
+                className={buttonClassName + " px-3"}
+              >
+                +
+              </button>
+            </div>
           </div>
         </section>
 
