@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { terminalSessionApi } from "@/lib/tauri";
+import { LOCAL_MACHINE_ID } from "@/lib/constants";
 import { resolveProxy } from "@/lib/proxyResolver";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useServerStore } from "@/stores/serverStore";
@@ -47,7 +48,9 @@ export function useTerminalActions() {
       const channel = createChannel((sessionId, status, reason) => {
         updateSessionStatus(sessionId, status, reason);
       });
-      const sessionId = await terminalSessionApi.connect(serverId, channel, proxy);
+      const sessionId = serverId === LOCAL_MACHINE_ID
+        ? await terminalSessionApi.connectLocal(channel, proxy)
+        : await terminalSessionApi.connect(serverId, channel, proxy);
       storeChannel(sessionId, channel);
       addSession({
         id: sessionId,
@@ -63,7 +66,12 @@ export function useTerminalActions() {
   const disconnect = useCallback(
     async (sessionId: string) => {
       try {
-        await terminalSessionApi.disconnect(sessionId);
+        const session = useTerminalSessionStore.getState().sessions.find((s) => s.id === sessionId);
+        if (session?.serverId === LOCAL_MACHINE_ID) {
+          await terminalSessionApi.disconnectLocal(sessionId);
+        } else {
+          await terminalSessionApi.disconnect(sessionId);
+        }
       } catch {
         // Session may have already been removed from backend (e.g. server closed connection)
       }
