@@ -61,6 +61,7 @@ export function useTerminalStatusListener() {
 
     listen<TerminalStatusPayload>("terminal:status", (event) => {
       const { session_id, status, reason } = event.payload;
+      console.log("[terminal:status]", { session_id, status, reason });
       updateSessionStatus(session_id, status, reason);
     }).then((fn) => {
       if (cancelled) fn(); else unlisten = fn;

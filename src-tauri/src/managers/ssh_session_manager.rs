@@ -172,35 +172,48 @@ async fn run_session(
     // 1. TCP connect + SSH handshake
     let russh_config = Arc::new(Config::default());
     let addr = format!("{}:{}", config.host, config.port);
+    eprintln!("[ssh] Connecting to {}", addr);
     let mut ssh_handle: Handle<SshClientHandler> =
-        client::connect(russh_config, addr.as_str(), SshClientHandler).await?;
+        client::connect(russh_config, addr.as_str(), SshClientHandler).await
+        .map_err(|e| { eprintln!("[ssh] TCP/handshake failed: {}", e); e })?;
+    eprintln!("[ssh] TCP+handshake OK");
 
     // 2. Authenticate
+    eprintln!("[ssh] Authenticating as '{}'", config.username);
     let auth_result = match &config.auth {
         SshAuthMethod::Password(password) => {
             ssh_handle
                 .authenticate_password(config.username.as_str(), password.as_str())
-                .await?
+                .await
+                .map_err(|e| { eprintln!("[ssh] authenticate_password error: {}", e); e })?
         }
         SshAuthMethod::PrivateKey { path, passphrase } => {
             let expanded = shellexpand::tilde(path).to_string();
-            let key = load_secret_key(&expanded, passphrase.as_deref())?;
+            eprintln!("[ssh] Loading key from: {}", expanded);
+            let key = load_secret_key(&expanded, passphrase.as_deref())
+                .map_err(|e| { eprintln!("[ssh] load_secret_key error: {}", e); e })?;
             let key_with_alg = PrivateKeyWithHashAlg::new(Arc::new(key), None);
             ssh_handle
                 .authenticate_publickey(config.username.as_str(), key_with_alg)
-                .await?
+                .await
+                .map_err(|e| { eprintln!("[ssh] authenticate_publickey error: {}", e); e })?
         }
     };
 
     if !auth_result.success() {
+        eprintln!("[ssh] Authentication rejected by server");
         return Err("Authentication failed".into());
     }
+    eprintln!("[ssh] Authenticated OK");
 
     // 3. Open session channel, request PTY and shell
-    let mut channel = ssh_handle.channel_open_session().await?;
+    eprintln!("[ssh] Opening channel");
+    let mut channel = ssh_handle.channel_open_session().await
+        .map_err(|e| { eprintln!("[ssh] channel_open_session error: {}", e); e })?;
+    eprintln!("[ssh] Requesting PTY");
     channel
         .request_pty(
-            false,
+            true,
             "xterm-256color",
             config.initial_cols as u32,
             config.initial_rows as u32,
@@ -208,8 +221,12 @@ async fn run_session(
             0,
             &[],
         )
-        .await?;
-    channel.request_shell(false).await?;
+        .await
+        .map_err(|e| { eprintln!("[ssh] request_pty error: {}", e); e })?;
+    eprintln!("[ssh] Requesting shell");
+    channel.request_shell(true).await
+        .map_err(|e| { eprintln!("[ssh] request_shell error: {}", e); e })?;
+    eprintln!("[ssh] Shell started");
 
     // 4. Register session with input/resize channels
     let (input_tx, mut input_rx) = mpsc::channel::<Vec<u8>>(256);

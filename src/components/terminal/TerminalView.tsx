@@ -3,6 +3,7 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { useTerminalDataListener, useTerminalActions } from "@/hooks/useTerminalSession";
+import { useTerminalSessionStore } from "@/stores/terminalSessionStore";
 
 interface TerminalViewProps {
   sessionId: string;
@@ -13,6 +14,9 @@ export function TerminalView({ sessionId, isActive }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const session = useTerminalSessionStore((state) =>
+    state.sessions.find((s) => s.id === sessionId),
+  );
   const { sendInput, resize } = useTerminalActions();
 
   // Create xterm instance on mount
@@ -115,9 +119,25 @@ export function TerminalView({ sessionId, isActive }: TerminalViewProps) {
 
   return (
     <div
-      ref={containerRef}
       style={{ display: isActive ? "block" : "none" }}
-      className="h-full w-full overflow-hidden bg-[#0d1117]"
-    />
+      className="relative h-full w-full overflow-hidden bg-[#0d1117]"
+    >
+      <div
+        ref={containerRef}
+        className="h-full w-full overflow-hidden bg-[#0d1117]"
+      />
+      {(session?.status === "error" || session?.status === "disconnected") && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[#0d1117]/90">
+          <span className="text-sm font-semibold text-red-400">
+            {session.status === "error" ? "Connection failed" : "Disconnected"}
+          </span>
+          {session.errorReason && (
+            <span className="max-w-sm text-center text-xs text-[#8b949e]">
+              {session.errorReason}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
