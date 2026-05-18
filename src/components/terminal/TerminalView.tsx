@@ -60,27 +60,38 @@ export function TerminalView({ sessionId, isActive }: TerminalViewProps) {
       macOptionIsMeta: false,
     });
 
-    // Ctrl+C: copy selection; Ctrl+V: paste from clipboard
-    // Ctrl+Shift+C/V are also supported as alternatives
+    // Ctrl+C: copy selection (don't send ^C to shell when text is selected)
+    // Ctrl+V: return false to suppress xterm's keydown handling;
+    //         actual paste is handled by the capture-phase paste listener below
     terminal.attachCustomKeyEventHandler((ev) => {
-      const isCtrl = ev.ctrlKey;
-      if (ev.type !== "keydown" || !isCtrl) return true;
+      if (ev.type !== "keydown" || !ev.ctrlKey) return true;
 
       if (ev.key === "c" && terminal.hasSelection()) {
-        // Copy selection — don't send ^C to shell when text is selected
         navigator.clipboard?.writeText(terminal.getSelection()).catch(() => {});
         return false;
       }
 
       if (ev.key === "v") {
-        navigator.clipboard?.readText().then((text) => {
-          if (text) terminal.paste(text);
-        }).catch(() => {});
+        // Don't call terminal.paste() here — the browser will fire a `paste`
+        // event that we intercept below. Returning false only suppresses the
+        // raw ^V from being sent to the shell.
         return false;
       }
 
       return true;
     });
+
+    // Intercept paste events in capture phase so we handle them before xterm's
+    // internal textarea listener. This prevents the double-paste that would
+    // otherwise occur (once from our handler, once from xterm's native paste).
+    const handlePaste = (e: ClipboardEvent) => {
+      const text = e.clipboardData?.getData("text/plain") ?? "";
+      if (!text) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      sendInput(sessionId, new TextEncoder().encode(text));
+    };
+    document.addEventListener("paste", handlePaste, true);
 
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
@@ -105,6 +116,7 @@ export function TerminalView({ sessionId, isActive }: TerminalViewProps) {
     });
 
     return () => {
+      document.removeEventListener("paste", handlePaste, true);
       inputDispose.dispose();
       binaryDispose.dispose();
       terminal.dispose();
