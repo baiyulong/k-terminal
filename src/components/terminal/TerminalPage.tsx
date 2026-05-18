@@ -24,6 +24,9 @@ export function TerminalPage({ onOpenSettings }: TerminalPageProps) {
   const setActiveSession = useTerminalSessionStore(
     (state) => state.setActiveSession,
   );
+  const reorderSessions = useTerminalSessionStore(
+    (state) => state.reorderSessions,
+  );
 
   const { connect, disconnect } = useTerminalActions();
 
@@ -55,6 +58,7 @@ export function TerminalPage({ onOpenSettings }: TerminalPageProps) {
           onSelectTab={setActiveSession}
           onCloseTab={handleCloseTab}
           onAddTab={() => setIsSidebarOpen((v) => !v)}
+          onReorderTab={reorderSessions}
         />
 
         {/* Stack all TerminalViews; only active is visible */}
