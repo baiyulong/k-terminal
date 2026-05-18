@@ -84,7 +84,10 @@ export function TerminalView({ sessionId, isActive }: TerminalViewProps) {
     // Intercept paste events in capture phase so we handle them before xterm's
     // internal textarea listener. This prevents the double-paste that would
     // otherwise occur (once from our handler, once from xterm's native paste).
+    // Guard: only handle if this terminal's container contains the focused element,
+    // so that multiple mounted tabs don't all receive the same paste.
     const handlePaste = (e: ClipboardEvent) => {
+      if (!container.contains(document.activeElement)) return;
       const text = e.clipboardData?.getData("text/plain") ?? "";
       if (!text) return;
       e.preventDefault();
