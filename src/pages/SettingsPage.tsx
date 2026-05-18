@@ -95,8 +95,6 @@ export function SettingsPage({
     localShell !== "" &&
     !shellPresets.some((p) => p.value === localShell && p.value !== "__custom__");
 
-  console.log("[k-terminal] SettingsPage render: isWindows=", isWindows, "localShell=", JSON.stringify(localShell));
-
   // Load system fonts from Rust (fc-list / PowerShell) with JS Font Access API fallback
   const [lastImportResult, setLastImportResult] = useState<ImportResult | null>(
     null,
@@ -183,7 +181,7 @@ export function SettingsPage({
   };
 
   return (
-    <div className="h-screen overflow-y-auto bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">
+    <div className="h-screen w-screen overflow-x-hidden overflow-y-auto bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">
       <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col gap-6 px-6 py-6">
         <header className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-6 py-5 shadow-sm">
           <div>
@@ -321,7 +319,6 @@ export function SettingsPage({
                   key={p.value}
                   type="button"
                   onClick={() => {
-                    console.log("[k-terminal] Shell button clicked:", JSON.stringify(p.value));
                     setLocalShell(p.value);
                   }}
                   className={[
