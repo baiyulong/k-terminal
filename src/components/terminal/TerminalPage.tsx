@@ -99,7 +99,10 @@ export function TerminalPage({ onOpenSettings }: TerminalPageProps) {
           onReorderTab={reorderSessions}
         />
 
-        {/* Stack all TerminalViews; only active is visible */}
+        {/* Stack all TerminalViews; only active is visible.
+            Use display:none (not visibility:hidden) so native scrollbars
+            from inactive tabs don't bleed through in WebView2. xterm.js
+            buffers writes while hidden; the isActive effect re-fits on show. */}
         <div className="relative flex-1 overflow-hidden">
           {sessions.length === 0 ? (
             <div className="flex h-full items-center justify-center">
@@ -111,11 +114,7 @@ export function TerminalPage({ onOpenSettings }: TerminalPageProps) {
             sessions.map((session) => (
               <div
                 key={session.id}
-                className="absolute inset-0"
-                style={{
-                  visibility: session.id === activeSessionId ? "visible" : "hidden",
-                  pointerEvents: session.id === activeSessionId ? "auto" : "none",
-                }}
+                className={`absolute inset-0${session.id === activeSessionId ? "" : " hidden"}`}
               >
                 <TerminalView
                   sessionId={session.id}
