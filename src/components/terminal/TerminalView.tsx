@@ -6,6 +6,7 @@ import { useTerminalActions } from "@/hooks/useTerminalSession";
 import { registerDataHandler, unregisterDataHandler } from "@/lib/terminalChannels";
 import { useTerminalSessionStore } from "@/stores/terminalSessionStore";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { copyTextToClipboard } from "@/lib/clipboard";
 
 interface TerminalViewProps {
   sessionId: string;
@@ -67,7 +68,7 @@ export function TerminalView({ sessionId, isActive }: TerminalViewProps) {
       if (ev.type !== "keydown" || !ev.ctrlKey) return true;
 
       if (ev.key === "c" && terminal.hasSelection()) {
-        navigator.clipboard?.writeText(terminal.getSelection()).catch(() => {});
+        copyTextToClipboard(terminal.getSelection()).catch(() => {});
         return false;
       }
 
@@ -101,6 +102,25 @@ export function TerminalView({ sessionId, isActive }: TerminalViewProps) {
     terminal.open(container);
     fitAddon.fit();
 
+    // Re-fit after fonts load: web fonts may not be ready at open() time,
+    // causing wrong charWidth → too many columns → text overflows right edge
+    // and IME candidate window appears at wrong position initially.
+    document.fonts.ready.then(() => {
+      if (fitAddonRef.current && terminalRef.current) {
+        fitAddonRef.current.fit();
+      }
+    });
+
+    // Prevent browser auto-scroll from causing horizontal jitter during IME composition.
+    // CSS overflow:hidden still allows programmatic scroll (unlike overflow:clip);
+    // when the IME activates the helper textarea the browser can scroll the container.
+    // Resetting scrollLeft to 0 on every scroll event eliminates the jitter.
+    const xtermEl = container.querySelector(".xterm") as HTMLElement | null;
+    const resetContainerScroll = () => { container.scrollLeft = 0; };
+    const resetXtermScroll = () => { if (xtermEl) xtermEl.scrollLeft = 0; };
+    container.addEventListener("scroll", resetContainerScroll, { passive: true });
+    if (xtermEl) xtermEl.addEventListener("scroll", resetXtermScroll, { passive: true });
+
     terminalRef.current = terminal;
     fitAddonRef.current = fitAddon;
 
@@ -119,6 +139,8 @@ export function TerminalView({ sessionId, isActive }: TerminalViewProps) {
     });
 
     return () => {
+      container.removeEventListener("scroll", resetContainerScroll);
+      xtermEl?.removeEventListener("scroll", resetXtermScroll);
       document.removeEventListener("paste", handlePaste, true);
       inputDispose.dispose();
       binaryDispose.dispose();

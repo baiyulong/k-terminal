@@ -57,3 +57,8 @@ body {
   padding: 0;
   overflow: hidden;
 }
+
+/* Prevent IME composition from causing horizontal scroll in the xterm viewport */
+.xterm-viewport {
+  overflow-x: hidden !important;
+}
