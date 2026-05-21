@@ -50,8 +50,9 @@ export function TerminalPage({ onOpenSettings }: TerminalPageProps) {
         onTogglePopover={() => setIsSidebarOpen((v) => !v)}
       />
 
-      {/* Terminal area */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      {/* Terminal area — min-w-0 prevents flex child from exceeding allocated width
+          (flex default min-width:auto lets content dictate width → xterm measures 100vw) */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TerminalTabs
           sessions={sessions}
           activeSessionId={activeSessionId}
