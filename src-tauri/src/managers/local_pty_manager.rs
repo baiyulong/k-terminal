@@ -59,18 +59,25 @@ impl LocalPtyManager {
         shell: Option<String>,
     ) -> Result<(), String> {
         let pty_system = native_pty_system();
-        let size = PtySize { rows, cols, pixel_width: 0, pixel_height: 0 };
+        let size = PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        };
         let pair = pty_system.openpty(size).map_err(|e| e.to_string())?;
 
         // Use caller-provided shell if specified, otherwise auto-detect
-        let shell = shell
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| {
-                #[cfg(windows)]
-                { std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string()) }
-                #[cfg(not(windows))]
-                { std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string()) }
-            });
+        let shell = shell.filter(|s| !s.is_empty()).unwrap_or_else(|| {
+            #[cfg(windows)]
+            {
+                std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string())
+            }
+            #[cfg(not(windows))]
+            {
+                std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string())
+            }
+        });
         println!("[local-pty] Spawning shell: {:?}", shell);
 
         let mut cmd = CommandBuilder::new(&shell);
@@ -78,11 +85,15 @@ impl LocalPtyManager {
 
         // Inject proxy environment variables when a proxy is configured
         if let Some(ref p) = proxy {
-            let scheme = if p.proxy_type == "socks5" { "socks5" } else { "http" };
+            let scheme = if p.proxy_type == "socks5" {
+                "socks5"
+            } else {
+                "http"
+            };
             let proxy_url = format!("{}://{}:{}", scheme, p.host, p.port);
             cmd.env("HTTP_PROXY", &proxy_url);
             cmd.env("HTTPS_PROXY", &proxy_url);
-            cmd.env("http_proxy", &proxy_url);  // lowercase for Linux
+            cmd.env("http_proxy", &proxy_url); // lowercase for Linux
             cmd.env("https_proxy", &proxy_url);
 
             if let Some(bypass) = p.bypass.as_deref().filter(|s| !s.is_empty()) {
@@ -120,7 +131,10 @@ impl LocalPtyManager {
             child: child_arc,
         };
 
-        self.sessions.lock().unwrap_or_else(|e| e.into_inner()).insert(session_id.clone(), handle);
+        self.sessions
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(session_id.clone(), handle);
 
         // Emit "connected" immediately
         let _ = channel.send(TerminalChannelMessage::Status(TerminalStatusEvent {
@@ -153,7 +167,11 @@ impl LocalPtyManager {
             let _ = channel.send(TerminalChannelMessage::Status(TerminalStatusEvent {
                 session_id,
                 status: if exit_clean { "disconnected" } else { "error" }.to_string(),
-                reason: if exit_clean { None } else { Some("Shell exited unexpectedly".to_string()) },
+                reason: if exit_clean {
+                    None
+                } else {
+                    Some("Shell exited unexpectedly".to_string())
+                },
             }));
         });
 
@@ -194,7 +212,12 @@ impl LocalPtyManager {
         if let Some(arc) = master_arc {
             if let Ok(master) = arc.lock() {
                 return master
-                    .resize(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
+                    .resize(PtySize {
+                        rows,
+                        cols,
+                        pixel_width: 0,
+                        pixel_height: 0,
+                    })
                     .is_ok();
             }
         }

@@ -120,7 +120,10 @@ pub struct SshConnectConfig {
 #[derive(Debug, Clone)]
 pub enum SshAuthMethod {
     Password(String),
-    PrivateKey { path: String, passphrase: Option<String> },
+    PrivateKey {
+        path: String,
+        passphrase: Option<String>,
+    },
 }
 
 /// Proxy configuration resolved by the frontend before connecting.
@@ -141,12 +144,12 @@ struct SshClientHandler;
 impl client::Handler for SshClientHandler {
     type Error = russh::Error;
 
-    fn check_server_key(
+    async fn check_server_key(
         &mut self,
         _server_public_key: &russh::keys::ssh_key::PublicKey,
-    ) -> impl std::future::Future<Output = Result<bool, Self::Error>> + Send {
+    ) -> Result<bool, Self::Error> {
         // MVP: accept all host keys
-        async { Ok(true) }
+        Ok(true)
     }
 }
 
@@ -154,26 +157,27 @@ impl client::Handler for SshClientHandler {
 
 /// Spawns an async task that connects via russh, authenticates, opens a PTY
 /// channel, and pumps data bidirectionally until the session ends.
-pub async fn establish_session(
-    manager: SshSessionManager,
-    config: SshConnectConfig,
-) {
+pub async fn establish_session(manager: SshSessionManager, config: SshConnectConfig) {
     let session_id = config.session_id.clone();
     let channel = config.channel.clone();
 
     // Send "connecting" immediately so frontend shows yellow dot
-    channel.send(TerminalChannelMessage::Status(TerminalStatusEvent {
-        session_id: session_id.clone(),
-        status: "connecting".to_string(),
-        reason: None,
-    })).ok();
+    channel
+        .send(TerminalChannelMessage::Status(TerminalStatusEvent {
+            session_id: session_id.clone(),
+            status: "connecting".to_string(),
+            reason: None,
+        }))
+        .ok();
 
     if let Err(err) = run_session(manager.clone(), config).await {
-        channel.send(TerminalChannelMessage::Status(TerminalStatusEvent {
-            session_id: session_id.clone(),
-            status: "error".to_string(),
-            reason: Some(err.to_string()),
-        })).ok();
+        channel
+            .send(TerminalChannelMessage::Status(TerminalStatusEvent {
+                session_id: session_id.clone(),
+                status: "error".to_string(),
+                reason: Some(err.to_string()),
+            }))
+            .ok();
         manager.remove(&session_id).await;
     }
 }
@@ -191,12 +195,10 @@ async fn build_proxied_stream(
         }
         Some(p) if p.proxy_type == "socks5" => {
             eprintln!("[proxy] SOCKS5 via {}:{}", p.host, p.port);
-            let socks = Socks5Stream::connect(
-                (p.host.as_str(), p.port),
-                (target_host, target_port),
-            )
-            .await
-            .map_err(|e| format!("SOCKS5 proxy error: {}", e))?;
+            let socks =
+                Socks5Stream::connect((p.host.as_str(), p.port), (target_host, target_port))
+                    .await
+                    .map_err(|e| format!("SOCKS5 proxy error: {}", e))?;
             Ok(socks.into_inner())
         }
         Some(p) => {
@@ -253,32 +255,45 @@ async fn run_session(
     eprintln!("[ssh] Connecting to {}", addr);
     let stream = build_proxied_stream(&config.host, config.port, config.proxy.as_ref())
         .await
-        .map_err(|e| { eprintln!("[ssh] TCP connect failed: {}", e); e })?;
+        .map_err(|e| {
+            eprintln!("[ssh] TCP connect failed: {}", e);
+            e
+        })?;
     eprintln!("[ssh] TCP connect OK");
     let mut ssh_handle: Handle<SshClientHandler> =
-        client::connect_stream(russh_config, stream, SshClientHandler).await
-        .map_err(|e| { eprintln!("[ssh] SSH handshake failed: {}", e); e })?;
+        client::connect_stream(russh_config, stream, SshClientHandler)
+            .await
+            .map_err(|e| {
+                eprintln!("[ssh] SSH handshake failed: {}", e);
+                e
+            })?;
     eprintln!("[ssh] TCP+handshake OK");
 
     // 2. Authenticate
     eprintln!("[ssh] Authenticating as '{}'", config.username);
     let auth_result = match &config.auth {
-        SshAuthMethod::Password(password) => {
-            ssh_handle
-                .authenticate_password(config.username.as_str(), password.as_str())
-                .await
-                .map_err(|e| { eprintln!("[ssh] authenticate_password error: {}", e); e })?
-        }
+        SshAuthMethod::Password(password) => ssh_handle
+            .authenticate_password(config.username.as_str(), password.as_str())
+            .await
+            .map_err(|e| {
+                eprintln!("[ssh] authenticate_password error: {}", e);
+                e
+            })?,
         SshAuthMethod::PrivateKey { path, passphrase } => {
             let expanded = shellexpand::tilde(path).to_string();
             eprintln!("[ssh] Loading key from: {}", expanded);
-            let key = load_secret_key(&expanded, passphrase.as_deref())
-                .map_err(|e| { eprintln!("[ssh] load_secret_key error: {}", e); e })?;
+            let key = load_secret_key(&expanded, passphrase.as_deref()).map_err(|e| {
+                eprintln!("[ssh] load_secret_key error: {}", e);
+                e
+            })?;
             let key_with_alg = PrivateKeyWithHashAlg::new(Arc::new(key), None);
             ssh_handle
                 .authenticate_publickey(config.username.as_str(), key_with_alg)
                 .await
-                .map_err(|e| { eprintln!("[ssh] authenticate_publickey error: {}", e); e })?
+                .map_err(|e| {
+                    eprintln!("[ssh] authenticate_publickey error: {}", e);
+                    e
+                })?
         }
     };
 
@@ -290,8 +305,10 @@ async fn run_session(
 
     // 3. Open session ssh_channel, request PTY and shell
     eprintln!("[ssh] Opening ssh_channel");
-    let mut ssh_channel = ssh_handle.channel_open_session().await
-        .map_err(|e| { eprintln!("[ssh] channel_open_session error: {}", e); e })?;
+    let mut ssh_channel = ssh_handle.channel_open_session().await.map_err(|e| {
+        eprintln!("[ssh] channel_open_session error: {}", e);
+        e
+    })?;
     eprintln!("[ssh] Requesting PTY");
     ssh_channel
         .request_pty(
@@ -304,10 +321,15 @@ async fn run_session(
             &[],
         )
         .await
-        .map_err(|e| { eprintln!("[ssh] request_pty error: {}", e); e })?;
+        .map_err(|e| {
+            eprintln!("[ssh] request_pty error: {}", e);
+            e
+        })?;
     eprintln!("[ssh] Requesting shell");
-    ssh_channel.request_shell(true).await
-        .map_err(|e| { eprintln!("[ssh] request_shell error: {}", e); e })?;
+    ssh_channel.request_shell(true).await.map_err(|e| {
+        eprintln!("[ssh] request_shell error: {}", e);
+        e
+    })?;
     eprintln!("[ssh] Shell started");
 
     // 4. Register session with input/resize channels
@@ -376,11 +398,13 @@ async fn run_session(
     }
 
     manager.remove(&session_id).await;
-    channel.send(TerminalChannelMessage::Status(TerminalStatusEvent {
-        session_id,
-        status: "disconnected".to_string(),
-        reason: None,
-    })).ok();
+    channel
+        .send(TerminalChannelMessage::Status(TerminalStatusEvent {
+            session_id,
+            status: "disconnected".to_string(),
+            reason: None,
+        }))
+        .ok();
 
     Ok(())
 }

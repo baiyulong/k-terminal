@@ -1,12 +1,13 @@
-use tauri::State;
 use tauri::ipc::Channel;
+use tauri::State;
 use uuid::Uuid;
 
 use crate::db::DbPool;
 use crate::managers::local_pty_manager::LocalPtyManager;
 use crate::managers::server_manager::ServerManager;
 use crate::managers::ssh_session_manager::{
-    establish_session, ProxyConfig, SshAuthMethod, SshConnectConfig, SshSessionManager, TerminalChannelMessage,
+    establish_session, ProxyConfig, SshAuthMethod, SshConnectConfig, SshSessionManager,
+    TerminalChannelMessage,
 };
 use crate::security::keyring::CredentialStore;
 

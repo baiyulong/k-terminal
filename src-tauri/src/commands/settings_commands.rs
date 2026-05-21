@@ -47,7 +47,7 @@ pub fn list_system_fonts() -> Vec<String> {
                 .map(|l| l.trim().to_string())
                 .filter(|s| !s.is_empty())
                 .collect();
-            fonts.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+            fonts.sort_by_key(|a| a.to_lowercase());
             fonts.dedup();
             return fonts;
         }
@@ -69,7 +69,7 @@ pub fn list_system_fonts() -> Vec<String> {
                     .map(|l| l.trim().to_string())
                     .filter(|s| !s.is_empty())
                     .collect();
-                fonts.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+                fonts.sort_by_key(|a| a.to_lowercase());
                 return fonts;
             }
         }
