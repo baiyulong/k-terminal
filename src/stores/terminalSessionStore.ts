@@ -22,6 +22,7 @@ interface TerminalSessionStore {
     reason?: string,
   ) => void;
   setActiveSession: (sessionId: string | null) => void;
+  reorderSessions: (fromIndex: number, toIndex: number) => void;
 }
 
 export const useTerminalSessionStore = create<TerminalSessionStore>((set) => ({
@@ -52,4 +53,12 @@ export const useTerminalSessionStore = create<TerminalSessionStore>((set) => ({
     })),
 
   setActiveSession: (sessionId) => set({ activeSessionId: sessionId }),
+
+  reorderSessions: (fromIndex, toIndex) =>
+    set((state) => {
+      const sessions = [...state.sessions];
+      const [moved] = sessions.splice(fromIndex, 1);
+      sessions.splice(toIndex, 0, moved);
+      return { sessions };
+    }),
 }));

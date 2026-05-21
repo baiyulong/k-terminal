@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { terminalProfilesQueryKey } from "@/hooks/useTerminalProfiles";
 import { groupsListQueryKey, groupsTreeQueryKey } from "@/hooks/useGroups";
@@ -41,7 +41,33 @@ export function SettingsPage({
   const setProxyBypass = useSettingsStore((state) => state.setProxyBypass);
   const localShell = useSettingsStore((state) => state.localShell);
   const setLocalShell = useSettingsStore((state) => state.setLocalShell);
-  const [systemFonts, setSystemFonts] = useState<string[]>([...TERMINAL_FONT_FAMILIES]);
+
+  // Cache font list with React Query (staleTime: Infinity = load once per app session)
+  const systemFontsQuery = useQuery({
+    queryKey: ["system-fonts"],
+    queryFn: async (): Promise<string[]> => {
+      try {
+        const rustFonts = await settingsApi.listSystemFonts();
+        if (rustFonts.length > 0) return rustFonts;
+      } catch { /* Rust command unavailable */ }
+      // Fallback: JS Font Access API (Chromium / Windows WebView2)
+      if ("queryLocalFonts" in window) {
+        try {
+          // @ts-expect-error Font Access API not yet in lib.dom.d.ts
+          const fonts: { family: string }[] = await window.queryLocalFonts();
+          const families = [...new Set(fonts.map((f) => f.family))].sort((a, b) =>
+            a.toLowerCase().localeCompare(b.toLowerCase()),
+          );
+          if (families.length > 0) return families;
+        } catch { /* Permission denied or API unavailable */ }
+      }
+      return [...TERMINAL_FONT_FAMILIES];
+    },
+    staleTime: Infinity,   // Don't refetch — fonts don't change while app is running
+    gcTime: Infinity,      // Keep in cache forever
+    initialData: [...TERMINAL_FONT_FAMILIES],
+  });
+  const systemFonts = systemFontsQuery.data ?? [...TERMINAL_FONT_FAMILIES];
 
   const isWindows = typeof navigator !== "undefined" &&
     navigator.userAgent.toLowerCase().includes("windows");
@@ -69,37 +95,7 @@ export function SettingsPage({
     localShell !== "" &&
     !shellPresets.some((p) => p.value === localShell && p.value !== "__custom__");
 
-  console.log("[k-terminal] SettingsPage render: isWindows=", isWindows, "localShell=", JSON.stringify(localShell));
-
   // Load system fonts from Rust (fc-list / PowerShell) with JS Font Access API fallback
-  useEffect(() => {
-    (async () => {
-      try {
-        const rustFonts = await settingsApi.listSystemFonts();
-        if (rustFonts.length > 0) {
-          setSystemFonts(rustFonts);
-          return;
-        }
-      } catch {
-        // Rust command unavailable
-      }
-      // Fallback: JS Font Access API (Chromium / Windows WebView2)
-      if ("queryLocalFonts" in window) {
-        try {
-          // @ts-expect-error Font Access API not yet in lib.dom.d.ts
-          const fonts: { family: string }[] = await window.queryLocalFonts();
-          const families = [...new Set(fonts.map((f) => f.family))].sort((a, b) =>
-            a.toLowerCase().localeCompare(b.toLowerCase()),
-          );
-          if (families.length > 0) {
-            setSystemFonts(families);
-          }
-        } catch {
-          // Permission denied or API unavailable
-        }
-      }
-    })();
-  }, []);
   const [lastImportResult, setLastImportResult] = useState<ImportResult | null>(
     null,
   );
@@ -185,7 +181,7 @@ export function SettingsPage({
   };
 
   return (
-    <div className="h-screen overflow-y-auto bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">
+    <div className="h-screen w-screen overflow-x-hidden overflow-y-auto bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">
       <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col gap-6 px-6 py-6">
         <header className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-6 py-5 shadow-sm">
           <div>
@@ -323,7 +319,6 @@ export function SettingsPage({
                   key={p.value}
                   type="button"
                   onClick={() => {
-                    console.log("[k-terminal] Shell button clicked:", JSON.stringify(p.value));
                     setLocalShell(p.value);
                   }}
                   className={[

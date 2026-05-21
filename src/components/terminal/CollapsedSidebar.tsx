@@ -5,6 +5,7 @@ interface CollapsedSidebarProps {
   servers: Server[];
   onSelectServer: (server: Server) => void;
   onOpenSettings: () => void;
+  onAddServer: () => void;
   isPopoverOpen: boolean;
   onTogglePopover: () => void;
 }
@@ -13,6 +14,7 @@ export function CollapsedSidebar({
   servers,
   onSelectServer,
   onOpenSettings,
+  onAddServer,
   isPopoverOpen,
   onTogglePopover,
 }: CollapsedSidebarProps) {
@@ -52,6 +54,7 @@ export function CollapsedSidebar({
           servers={servers}
           onSelectServer={onSelectServer}
           onClose={() => onTogglePopover()}
+          onAddServer={onAddServer}
         />
       )}
     </div>
