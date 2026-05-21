@@ -5,12 +5,14 @@ interface ServerPopoverProps {
   servers: Server[];
   onSelectServer: (server: Server) => void;
   onClose: () => void;
+  onAddServer: () => void;
 }
 
 export function ServerPopover({
   servers,
   onSelectServer,
   onClose,
+  onAddServer,
 }: ServerPopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -30,10 +32,18 @@ export function ServerPopover({
       ref={ref}
       className="absolute left-12 top-0 z-50 flex h-full w-72 flex-col border-r border-[#30363d] bg-[#0d1117] shadow-2xl"
     >
-      <div className="border-b border-[#30363d] px-4 py-3">
+      <div className="flex items-center justify-between border-b border-[#30363d] px-4 py-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-[#8b949e]">
           Servers
         </p>
+        <button
+          type="button"
+          onClick={() => { onAddServer(); onClose(); }}
+          title="Add new server"
+          className="flex h-6 w-6 items-center justify-center rounded text-lg text-[#8b949e] hover:bg-[#161b22] hover:text-[#e6edf3]"
+        >
+          ＋
+        </button>
       </div>
       <div className="flex-1 overflow-y-auto py-2">
         {servers.length === 0 ? (
