@@ -102,6 +102,25 @@ export function TerminalView({ sessionId, isActive }: TerminalViewProps) {
     terminal.open(container);
     fitAddon.fit();
 
+    // OSC 52 clipboard write handler — used by TUI apps (Copilot CLI, vim, tmux…)
+    // xterm.js v6 has no built-in OSC 52 support, so we register our own.
+    // Format: \e]52;Pc;Pd\07  where Pd is base64-encoded UTF-8 text.
+    const osc52 = terminal.parser.registerOscHandler(52, (data: string) => {
+      const semi = data.indexOf(";");
+      if (semi === -1) return false;
+      const b64 = data.slice(semi + 1);
+      if (!b64 || b64 === "?") return false; // read request — ignore
+      try {
+        // Use TextDecoder for proper UTF-8 (handles CJK characters)
+        const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+        const text = new TextDecoder().decode(bytes);
+        copyTextToClipboard(text).catch(() => {});
+      } catch {
+        // Malformed base64 — ignore
+      }
+      return true;
+    });
+
     // Re-fit after fonts load: web fonts may not be ready at open() time,
     // causing wrong charWidth → too many columns → text overflows right edge
     // and IME candidate window appears at wrong position initially.
@@ -139,6 +158,7 @@ export function TerminalView({ sessionId, isActive }: TerminalViewProps) {
     });
 
     return () => {
+      osc52.dispose();
       container.removeEventListener("scroll", resetContainerScroll);
       xtermEl?.removeEventListener("scroll", resetXtermScroll);
       document.removeEventListener("paste", handlePaste, true);
