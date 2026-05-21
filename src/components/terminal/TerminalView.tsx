@@ -64,6 +64,9 @@ export function TerminalView({ sessionId, isActive }: TerminalViewProps) {
     // Ctrl+C: copy selection (don't send ^C to shell when text is selected)
     // Ctrl+V: return false to suppress xterm's keydown handling;
     //         actual paste is handled by the capture-phase paste listener below
+    // Ctrl+Enter: send Kitty protocol sequence \x1b[13;5u so TUI apps
+    //         (Copilot CLI, etc.) can distinguish it from plain Enter (\r)
+    const encoder = new TextEncoder();
     terminal.attachCustomKeyEventHandler((ev) => {
       if (ev.type !== "keydown" || !ev.ctrlKey) return true;
 
@@ -76,6 +79,14 @@ export function TerminalView({ sessionId, isActive }: TerminalViewProps) {
         // Don't call terminal.paste() here — the browser will fire a `paste`
         // event that we intercept below. Returning false only suppresses the
         // raw ^V from being sent to the shell.
+        return false;
+      }
+
+      if (ev.key === "Enter") {
+        // xterm sends \r for both Enter and Ctrl+Enter; apps can't distinguish.
+        // Send the Kitty keyboard protocol sequence instead so apps that
+        // support it (Copilot CLI, Neovim, WezTerm-style apps) get a newline.
+        sendInput(sessionId, encoder.encode("\x1b[13;5u"));
         return false;
       }
 
